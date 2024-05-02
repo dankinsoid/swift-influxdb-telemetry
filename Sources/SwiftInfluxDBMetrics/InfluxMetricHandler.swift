@@ -26,7 +26,7 @@ struct InfluxMetricHandler<Value: AtomicValue & ExpressibleByIntegerLiteral & Se
         operation(atomic)
         var fields = Dictionary(self.fields) { _, n in n }.mapValues(InfluxDBClient.Point.FieldValue.string)
         fields.merge(additional) { _, new in new }
-        fields[id.type] = value(atomic.load(ordering: .relaxed))
+        fields["value"] = value(atomic.load(ordering: .relaxed))
         api.write(
             measurement: id.label,
             tags: id.tags,
