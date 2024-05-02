@@ -11,11 +11,16 @@ final class FloatingCounter: InfluxMetric, FloatingPointCounterHandler {
     init(api: SwiftInfluxAPI, id: HandlerID, fields: [(String, String)]) {
         handler = InfluxMetricHandler(id: id, fields: fields, api: api) {
             .double(Double(bitPattern: $0))
+        } loaded: { decodable in
+            if let double = decodable as? any BinaryFloatingPoint {
+                return Double(double).bitPattern
+            }
+            return nil
         }
     }
 
     func increment(by amount: Double) {
-        handler.modify {
+        handler.modify(loadValues: true) {
             // We busy loop here until we can update the atomic successfully.
             // Using relaxed ordering here is sufficient, since the as-if rules guarantess that
             // the following operations are executed in the order presented here. Every statement

@@ -22,7 +22,6 @@ import Logging
 ///     )
 /// )
 /// ```
-
 public struct InfluxDBMetricsFactory: Sendable {
     
     private let api: SwiftInfluxAPI

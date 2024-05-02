@@ -11,11 +11,16 @@ final class Counter: InfluxMetric, CounterHandler {
     init(api: SwiftInfluxAPI, id: HandlerID, fields: [(String, String)]) {
         handler = InfluxMetricHandler(id: id, fields: fields, api: api) {
             .int($0)
+        } loaded: { decodable in
+            if let int = decodable as? any FixedWidthInteger {
+                return Int(int)
+            }
+            return nil
         }
     }
 
     func increment(by amount: Int64) {
-        handler.modify {
+        handler.modify(loadValues: true) {
             $0.wrappingIncrement(by: Int(amount), ordering: .relaxed)
         }
     }

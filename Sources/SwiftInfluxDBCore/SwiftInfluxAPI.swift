@@ -63,6 +63,28 @@ package final actor SwiftInfluxAPI: Sendable {
         self.labelsAsTags = labelsAsTags
     }
 
+    package func load(
+        measurement: String,
+        tags: [String: String],
+        fields: Set<String>
+    ) async throws -> QueryAPI.FluxRecord? {
+        let filter = ([("_measurement", measurement)] + tags.sorted(by: { $0.key < $1.key }) + fields.map { ("_field", $0) })
+            .map { "  |> filter(fn: (r) => r.\($0.key) == \"\($0.value)\")" }
+            .joined(separator: "\n")
+
+        return try await client.queryAPI.query(
+            query: """
+from(bucket: "\(bucket)")
+  |> range(start: -30d)
+\(filter)
+  |> last()
+""",
+            org: org,
+            responseQueue: responsesQueue
+        )
+        .next()
+    }
+
     nonisolated package func write(
         measurement: String,
         tags: [String: String],

@@ -19,6 +19,7 @@ struct HandlerID: Hashable {
                 fields.append((key, value))
             }
         }
+        tags["metric_type"] = type
         dimensions = fields
     }
 }
