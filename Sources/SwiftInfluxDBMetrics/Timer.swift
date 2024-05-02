@@ -16,7 +16,7 @@ final class TimerMetric: InfluxMetric, TimerHandler {
 
     func recordNanoseconds(_ duration: Int64) {
         handler.modify {
-            $0.wrappingIncrement(by: Int(duration), ordering: .relaxed)
+            $0.store(Int(duration), ordering: .relaxed)
         }
     }
 }
