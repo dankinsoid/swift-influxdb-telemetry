@@ -2,18 +2,42 @@ import Logging
 import InfluxDBSwift
 @_exported import SwiftInfluxDBCore
 
+/// InfluxDB Log Handler.
+/// `InfluxDBLogHandler` constructs a measurement for each log entry, using the logger's name as the measurement name.
+/// Log messages are stored in the `message` field, while log metadata may either be stored as fields or tags, based on the `metadataLabelsAsTags` parameter.
+/// Default metadata such as `file`, `source`, `log_level`, etc., can be indexed as tags; these defaults are modifiable via the `metadataLabelsAsTags` parameter.
+/// Default metadata labels are defined in the `String.InfluxDBLogHandlerLabels` namespace as static constants.
+///
+/// Usage:
+/// ```swift
+/// LoggingSystem.bootstrap { name in
+///     InfluxDBLogHandler(
+///         name: name,
+///         bucket: "your-bucket-name",
+///         org: "your-org-name",
+///         client: client,
+///         precision: .ms, // Optional
+///         batchSize: 5000, // Optional
+///         throttleInterval: 5, // Optional
+///         metadataLabelsAsTags: InfluxDBLogHandler.defaultMetadataLabelsAsTags.union([.InfluxDBLogHandlerLabels.file]), // Optional
+///         logLevel: .info, // Optional
+///         metadata: [:] // Optional
+///     )
+/// }
+/// ```
 public struct InfluxDBLogHandler: LogHandler {
-
+    
+    /// Default metadata labels as tags.
     public static let defaultMetadataLabelsAsTags: LabelsSet = [
         .InfluxDBLogHandlerLabels.source,
         .InfluxDBLogHandlerLabels.log_level
     ]
-
+    
     public var metadata: Logger.Metadata
     public var logLevel: Logger.Level
     public var name: String
     private let api: SwiftInfluxAPI
-
+    
     /// Create a new `InfluxDBLogHandler`.
     /// - Parameters:
     ///   - name: The logger name. Logger name used as a measurement name in InfluxDB.
@@ -75,9 +99,9 @@ public struct InfluxDBLogHandler: LogHandler {
         ] + self.metadata
             .merging(metadata ?? [:]) { _, new in new }
             .map { ($0.key, $0.value.fieldValue) }
-        
+
         api.write(
-            measurement: "\(name)_logger",
+            measurement: name,
             tags: [:],
             fields: ["message": .string(message.description)],
             unspecified: data

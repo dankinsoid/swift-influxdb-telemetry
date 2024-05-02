@@ -3,6 +3,26 @@ import InfluxDBSwift
 @_exported import SwiftInfluxDBCore
 import Logging
 
+/// InfluxDB Metrics Factory.
+/// `InfluxDBMetricsFactory` creates a unique handler for each combination of metric types, labels, and tags.
+/// In InfluxDB, tags are indexed dimensions. By default, all dimensions are indexed as tags.
+/// Use the `dimensionsLabelsAsTags` parameter to customize which dimensions are treated as tags.
+///
+/// Example of bootstrapping the Metrics System:
+/// ```swift
+/// MetricsSystem.bootstrap(
+///     InfluxDBMetricsFactory(
+///         bucket: "your-bucket-name",
+///         org: "your-org-name",
+///         client: client,
+///         precision: .ms, // Optional
+///         batchSize: 5000, // Optional
+///         throttleInterval: 10, // Optional
+///         dimensionsLabelsAsTags: .all // Optional
+///     )
+/// )
+/// ```
+
 public struct InfluxDBMetricsFactory: Sendable {
     
     private let api: SwiftInfluxAPI
@@ -13,8 +33,8 @@ public struct InfluxDBMetricsFactory: Sendable {
     ///   - bucket: The InfluxDB bucket to use.
     ///   - client: The InfluxDB client to use.
     ///   - precision: The timestamp precision to use. Defaults to milliseconds.
-    ///   - batchSize: The maximum number of points to batch before writing to InfluxDB. Defaults to 5000.
-    ///   - throttleInterval: The maximum number of seconds to wait before writing a batch of points. Defaults to 5.
+    ///   - batchSize: The maximum number of points to batch before writing to InfluxDB. Defaults to 5000. This default is based on [official recommendations](https://docs.influxdata.com/influxdb/v2/write-data/best-practices/optimize-writes/).
+    ///   - throttleInterval: The maximum number of seconds to wait before writing a batch of points. Defaults to 10.
     ///   - dimensionsLabelsAsTags: The set of labels to use as tags. Defaults to all.
     /// - Important: You should call `client.close()` at the end of your application to release allocated resources.
     public init(
@@ -23,7 +43,7 @@ public struct InfluxDBMetricsFactory: Sendable {
         client: InfluxDBClient,
         precision: InfluxDBClient.TimestampPrecision = .ms,
         batchSize: Int = 5000,
-        throttleInterval: UInt16 = 5,
+        throttleInterval: UInt16 = 10,
         dimensionsLabelsAsTags: LabelsSet = .all
     ) {
         api = SwiftInfluxAPI.make(

@@ -1,16 +1,72 @@
 # swift-influxdb-logs-metrics
 
-## Description
-This repository provides
+This library provides Swift-based tools for integrating InfluxDB with your application for metrics and logging purposes.
+The `InfluxDBMetricsFactory` is designed for metric collection, while the `InfluxDBLogHandler` is tailored for logging, both conforming to Swift's metrics and logging standards.
 
-## Example
+## Features
 
-```swift
+- **Metrics Collection**: Efficiently collects and batches metrics data to be written to InfluxDB.
+- **Logging**: Configurable logging that writes directly to InfluxDB, using metadata tags for enhanced query performance.
+- **Batching and Throttling**: Supports batching and throttling to optimize data writing to InfluxDB.
+- **Customizable Tagging**: Allows for flexible tagging of metrics and log data to support diverse querying needs.
 
-```
 ## Usage
 
- 
+### Setting Up Metrics Factory
+
+```swift
+import InfluxDBSwift
+import SwiftInfluxDBMetrics
+
+let client = InfluxDBClient(url: "your-influxdb-url", token: "your-auth-token")
+
+MetricsSystem.bootstrap(
+    InfluxDBMetricsFactory(
+        bucket: "your-bucket-name",
+        org: "your-org-name",
+        client: client,
+        precision: .ms, // Optional
+        batchSize: 5000, // Optional
+        throttleInterval: 5, // Optional
+        dimensionsLabelsAsTags: .all // Optional
+    )
+)
+```
+
+### Setting Up Log Handler
+
+```swift
+import InfluxDBSwift
+import SwiftInfluxDBLogs
+
+let client = InfluxDBClient(url: "your-influxdb-url", token: "your-auth-token")
+        
+LoggingSystem.bootstrap { name in
+    InfluxDBLogHandler(
+        name: name,
+        bucket: "your-bucket-name",
+        org: "your-org-name",
+        client: client,
+        precision: .ms, // Optional
+        batchSize: 5000, // Optional
+        throttleInterval: 5, // Optional
+        metadataLabelsAsTags: InfluxDBLogHandler.defaultMetadataLabelsAsTags.union([.InfluxDBLogHandlerLabels.file]), // Optional
+        logLevel: .info, // Optional
+        metadata: [:] // Optional
+    )
+}
+```
+
+### Writing Metrics and Logs
+
+```swift
+// Metrics
+let counter = Counter(label: "page_views", dimensions: ["type": "homepage"])
+counter.increment()
+
+// Logs
+Logger(label: "app").error("Something went wrong!")
+```
 ## Installation
 
 1. [Swift Package Manager](https://github.com/apple/swift-package-manager)

@@ -6,7 +6,8 @@ import PackageDescription
 let package = Package(
     name: "swift-influxdb-logs-metrics",
     platforms: [
-        .macOS(.v10_15)
+        .macOS(.v11),
+        .iOS(.v14),
     ],
     products: [
         .library(name: "SwiftInfluxDBLogs", targets: ["SwiftInfluxDBLogs"]),
