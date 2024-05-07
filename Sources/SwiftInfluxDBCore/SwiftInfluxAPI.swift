@@ -1,6 +1,11 @@
 import Foundation
 import InfluxDBSwift
 
+public struct InfluxDBAPIConfiguration: Equatable {
+    
+    
+}
+
 package final actor SwiftInfluxAPI: Sendable {
 
     private static var cache: [String: SwiftInfluxAPI] = [:]
@@ -12,7 +17,7 @@ package final actor SwiftInfluxAPI: Sendable {
     package nonisolated let org: String
     package nonisolated let throttleInterval: UInt64
     package nonisolated let precision: InfluxDBClient.TimestampPrecision
-    private let responsesQueue = DispatchQueue(label: "SwiftInfluxAPI.responsesQueue", qos: .background)
+    private let responsesQueue: DispatchQueue
     private var points: [InfluxDBClient.Point]
     private var writeTask: Task<Void, Error>?
 
@@ -61,6 +66,7 @@ package final actor SwiftInfluxAPI: Sendable {
         points.reserveCapacity(batchSize)
         self.points = points
         self.labelsAsTags = labelsAsTags
+        responsesQueue =  DispatchQueue(label: "SwiftInfluxAPI.responsesQueue.\(bucket)", qos: .background)
     }
 
     package func load(

@@ -18,12 +18,14 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-metrics.git", from: "2.4.0"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.5.0"),
         .package(url: "https://github.com/apple/swift-atomics.git", from: "1.2.0"),
+        .package(url: "https://github.com/dankinsoid/swift-analytics.git", from: "1.2.0"),
     ],
     targets: [
         .target(
             name: "SwiftInfluxDBLogs",
             dependencies: [
                 .product(name: "InfluxDBSwift", package: "influxdb-client-swift"),
+                .product(name: "Logging", package: "swift-log"),
                 .target(name: "SwiftInfluxDBCore")
             ]
         ),
@@ -37,9 +39,16 @@ let package = Package(
             ]
         ),
         .target(
+            name: "SwiftInfluxDBAnalytics",
+            dependencies: [
+                .product(name: "InfluxDBSwift", package: "influxdb-client-swift"),
+                .product(name: "SwiftAnalytics", package: "swift-analytics"),
+                .target(name: "SwiftInfluxDBCore")
+            ]
+        ),
+        .target(
             name: "SwiftInfluxDBCore",
             dependencies: [
-                .product(name: "Logging", package: "swift-log"),
             ]
         ),
     ]

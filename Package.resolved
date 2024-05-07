@@ -28,6 +28,15 @@
       }
     },
     {
+      "identity" : "swift-analytics",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/dankinsoid/swift-analytics.git",
+      "state" : {
+        "revision" : "4c389e51549e14b17d6e10d9e33e3f2edaa9c2b0",
+        "version" : "1.2.0"
+      }
+    },
+    {
       "identity" : "swift-atomics",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-atomics.git",
