@@ -24,34 +24,23 @@ import Logging
 /// ```
 public struct InfluxDBMetricsFactory: Sendable {
     
-    private let api: SwiftInfluxAPI
+    private let api: InfluxDBWriter
     private let box = NIOLockedValueBox([HandlerID: InfluxMetric]())
     
     /// Create a new `InfluxDBMetricsFactory`.
     /// - Parameters:
-    ///   - bucket: The InfluxDB bucket to use.
     ///   - client: The InfluxDB client to use.
-    ///   - precision: The timestamp precision to use. Defaults to milliseconds.
-    ///   - batchSize: The maximum number of points to batch before writing to InfluxDB. Defaults to 5000. This default is based on [official recommendations](https://docs.influxdata.com/influxdb/v2/write-data/best-practices/optimize-writes/).
-    ///   - throttleInterval: The maximum number of seconds to wait before writing a batch of points. Defaults to 10.
+    ///   - configs: The InfluxDB writer configurations.
     ///   - dimensionsLabelsAsTags: The set of labels to use as tags. Defaults to all.
     /// - Important: You should call `client.close()` at the end of your application to release allocated resources.
     public init(
-        bucket: String,
-        org: String,
         client: InfluxDBClient,
-        precision: InfluxDBClient.TimestampPrecision = .ms,
-        batchSize: Int = 5000,
-        throttleInterval: UInt16 = 10,
+        configs: InfluxDBWriterConfigs,
         dimensionsLabelsAsTags: LabelsSet = .all
     ) {
-        api = SwiftInfluxAPI.make(
+        api = InfluxDBWriter(
             client: client,
-            bucket: bucket,
-            org: org,
-            precision: precision,
-            batchSize: batchSize,
-            throttleInterval: throttleInterval,
+            configs: configs,
             labelsAsTags: dimensionsLabelsAsTags
         )
     }

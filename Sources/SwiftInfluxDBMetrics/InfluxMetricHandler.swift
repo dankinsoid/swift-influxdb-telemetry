@@ -9,14 +9,14 @@ struct InfluxMetricHandler<Value: AtomicValue & ExpressibleByIntegerLiteral & Se
     private let didLoad = ManagedAtomic(false)
     private let atomic = ManagedAtomic(0 as Value)
     private let query = NIOLockedValueBox([@Sendable () -> Void]())
-    private let api: SwiftInfluxAPI
+    private let api: InfluxDBWriter
     private let toValue: @Sendable (Decodable) -> Value?
     private let value: @Sendable (Value.AtomicRepresentation.Value) -> InfluxDBClient.Point.FieldValue
 
     init(
         id: HandlerID,
         fields: [(String, String)],
-        api: SwiftInfluxAPI,
+        api: InfluxDBWriter,
         value: @Sendable @escaping (Value.AtomicRepresentation.Value) -> InfluxDBClient.Point.FieldValue,
         loaded: @Sendable @escaping (Decodable) -> Value? = { _ in nil }
     ) {

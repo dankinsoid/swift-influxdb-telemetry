@@ -24,7 +24,6 @@ let package = Package(
         .target(
             name: "SwiftInfluxDBLogs",
             dependencies: [
-                .product(name: "InfluxDBSwift", package: "influxdb-client-swift"),
                 .product(name: "Logging", package: "swift-log"),
                 .target(name: "SwiftInfluxDBCore")
             ]
@@ -32,7 +31,6 @@ let package = Package(
         .target(
             name: "SwiftInfluxDBMetrics",
             dependencies: [
-                .product(name: "InfluxDBSwift", package: "influxdb-client-swift"),
                 .product(name: "Metrics", package: "swift-metrics"),
                 .product(name: "Atomics", package: "swift-atomics"),
                 .target(name: "SwiftInfluxDBCore")
@@ -41,7 +39,6 @@ let package = Package(
         .target(
             name: "SwiftInfluxDBAnalytics",
             dependencies: [
-                .product(name: "InfluxDBSwift", package: "influxdb-client-swift"),
                 .product(name: "SwiftAnalytics", package: "swift-analytics"),
                 .target(name: "SwiftInfluxDBCore")
             ]
@@ -49,6 +46,7 @@ let package = Package(
         .target(
             name: "SwiftInfluxDBCore",
             dependencies: [
+                .product(name: "InfluxDBSwift", package: "influxdb-client-swift"),
             ]
         ),
     ]

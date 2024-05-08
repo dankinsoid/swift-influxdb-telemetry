@@ -31,34 +31,23 @@ public struct InfluxDBAnalyticsHandler: AnalyticsHandler {
 
     public var parameters: Analytics.Parameters
 
-    private let api: SwiftInfluxAPI
+    private let api: InfluxDBWriter
     
     /// Create a new `InfluxDBAnalyticsHandler`.
     /// - Parameters:
-    ///   - bucket: The InfluxDB bucket to use.
     ///   - client: The InfluxDB client to use.
-    ///   - precision: The timestamp precision to use. Defaults to milliseconds.
-    ///   - batchSize: The maximum number of points to batch before writing to InfluxDB. Defaults to 5000.
-    ///   - throttleInterval: The maximum number of seconds to wait before writing a batch of points. Defaults to 5.
+    ///   - configs: The InfluxDB writer configurations.
     ///   - parametersLabelsAsTags: The set of metadata labels to use as tags. Defaults to ["source", "log_level"].
     /// - Important: You should call `client.close()` at the end of your application to release allocated resources.
     public init(
-        bucket: String,
-        org: String,
         client: InfluxDBClient,
-        precision: InfluxDBClient.TimestampPrecision = .ms,
-        batchSize: Int = 5000,
-        throttleInterval: UInt16 = 5,
+        configs: InfluxDBWriterConfigs,
         parametersLabelsAsTags: LabelsSet = Self.defaultMetadataLabelsAsTags,
         parameters: Analytics.Parameters = [:]
     ) {
-        api = SwiftInfluxAPI.make(
+        api = InfluxDBWriter(
             client: client,
-            bucket: bucket,
-            org: org,
-            precision: precision,
-            batchSize: batchSize,
-            throttleInterval: throttleInterval,
+            configs: configs,
             labelsAsTags: parametersLabelsAsTags
         )
         self.parameters = parameters

@@ -8,7 +8,7 @@ final class FloatingCounter: InfluxMetric, FloatingPointCounterHandler {
     var id: HandlerID { handler.id }
     let handler: InfluxMetricHandler<UInt64>
 
-    init(api: SwiftInfluxAPI, id: HandlerID, fields: [(String, String)]) {
+    init(api: InfluxDBWriter, id: HandlerID, fields: [(String, String)]) {
         handler = InfluxMetricHandler(id: id, fields: fields, api: api) {
             .double(Double(bitPattern: $0))
         } loaded: { decodable in
