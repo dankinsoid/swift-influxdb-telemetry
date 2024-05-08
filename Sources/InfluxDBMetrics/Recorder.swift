@@ -7,11 +7,16 @@ final class AggregateRecorder: InfluxMetric, RecorderHandler {
 
     var id: HandlerID { handler.id }
     let handler: InfluxMetricHandler<UInt64>
-    private let counter = ManagedAtomic<Int>(0)
+    let countHandler: InfluxMetricHandler<Int>
 
     init(api: InfluxDBWriter, id: HandlerID, fields: [(String, String)]) {
         handler = InfluxMetricHandler(id: id, fields: fields, api: api) {
             .double(Double(bitPattern: $0))
+        }
+        var counterID = id
+        counterID.label += "_total"
+        countHandler = InfluxMetricHandler(id: counterID, fields: fields, api: api) {
+            .int($0)
         }
     }
 
@@ -20,8 +25,10 @@ final class AggregateRecorder: InfluxMetric, RecorderHandler {
     }
 
     func record(_ value: Double) {
-        counter.wrappingIncrement(by: 1, ordering: .relaxed)
-        handler.modify(additional: ["\(handler.id.type)_count": .int(counter.load(ordering: .relaxed))]) {
+        countHandler.modify(loadValues: true) {
+            $0.wrappingDecrement(by: 1, ordering: .relaxed)
+        }
+        handler.modify {
             $0.store(value.bitPattern, ordering: .relaxed)
         }
     }

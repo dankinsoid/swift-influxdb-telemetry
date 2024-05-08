@@ -1,17 +1,20 @@
 import Atomics
 import InfluxDBSwift
 import SwiftInfluxDBCore
+import Foundation
 
-struct InfluxMetricHandler<Value: AtomicValue & ExpressibleByIntegerLiteral & Sendable>: Sendable where Value.AtomicRepresentation.Value == Value {
+final class InfluxMetricHandler<Value: AtomicValue & ExpressibleByIntegerLiteral & Sendable>: Sendable where Value.AtomicRepresentation.Value == Value {
 
     let id: HandlerID
     private let fields: [(String, String)]
     private let didLoad = ManagedAtomic(false)
     private let atomic = ManagedAtomic(0 as Value)
+    private let intervalTask = NIOLockedValueBox<Task<Void, Error>?>(nil)
     private let query = NIOLockedValueBox([@Sendable () -> Void]())
     private let api: InfluxDBWriter
     private let toValue: @Sendable (Decodable) -> Value?
     private let value: @Sendable (Value.AtomicRepresentation.Value) -> InfluxDBClient.Point.FieldValue
+    private let uuid = UUID()
 
     init(
         id: HandlerID,
@@ -27,22 +30,18 @@ struct InfluxMetricHandler<Value: AtomicValue & ExpressibleByIntegerLiteral & Se
         self.toValue = loaded
     }
 
+    deinit {
+        api.close(measurementID: uuid)
+    }
+
     func modify(
         loadValues: Bool = false,
-        additional: [String: InfluxDBClient.Point.FieldValue] = [:],
         _ operation: @Sendable @escaping (ManagedAtomic<Value>) -> Void
     ) {
-        let writeOperation: @Sendable () -> Void = {
-            operation(atomic)
-            var fields = Dictionary(self.fields) { _, n in n }.mapValues(InfluxDBClient.Point.FieldValue.string)
-            fields.merge(additional) { _, new in new }
-            fields["value"] = value(atomic.load(ordering: .relaxed))
-            api.write(
-                measurement: id.label,
-                tags: id.tags,
-                fields: fields,
-                unspecified: []
-            )
+        let writeOperation: @Sendable () -> Void = { [weak self] in
+            guard let self = self else { return }
+            operation(self.atomic)
+            self.write()
         }
         let isLoading = !query.withLockedValue(\.isEmpty)
         if isLoading || loadValues && !didLoad.load(ordering: .sequentiallyConsistent) {
@@ -50,6 +49,18 @@ struct InfluxMetricHandler<Value: AtomicValue & ExpressibleByIntegerLiteral & Se
         } else {
             writeOperation()
         }
+    }
+
+    private func write() {
+        var fields = Dictionary(self.fields) { _, n in n }.mapValues(InfluxDBClient.Point.FieldValue.string)
+        fields["value"] = value(atomic.load(ordering: .relaxed))
+        api.write(
+            measurement: id.label,
+            tags: id.tags,
+            fields: fields,
+            unspecified: [],
+            measurementID: uuid
+        )
     }
     
     private func addOperationToQueue(

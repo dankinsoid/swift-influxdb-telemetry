@@ -1,6 +1,7 @@
 import SwiftAnalytics
 import InfluxDBSwift
 @_exported import SwiftInfluxDBCore
+import Foundation
 
 /// InfluxDB Log Handler.
 /// `InfluxDBAnalyticsHandler` constructs a measurement for all events, using the event's name as the measurement name.
@@ -32,6 +33,7 @@ public struct InfluxDBAnalyticsHandler: AnalyticsHandler {
     public var parameters: Analytics.Parameters
 
     private let api: InfluxDBWriter
+    private let uuid = UUID()
     
     /// Create a new `InfluxDBAnalyticsHandler`.
     /// - Parameters:
@@ -67,7 +69,8 @@ public struct InfluxDBAnalyticsHandler: AnalyticsHandler {
             measurement: event.name,
             tags: [:],
             fields: [:],
-            unspecified: data
+            unspecified: data,
+            measurementID: uuid
         )
     }
 }

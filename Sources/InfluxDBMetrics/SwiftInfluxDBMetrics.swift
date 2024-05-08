@@ -36,11 +36,13 @@ public struct InfluxDBMetricsFactory: Sendable {
     public init(
         client: InfluxDBClient,
         configs: InfluxDBWriterConfigs,
+        intervalType: IntervalType = .irregular,
         dimensionsLabelsAsTags: LabelsSet = .all
     ) {
         api = InfluxDBWriter(
             client: client,
             configs: configs,
+            intervalType: intervalType,
             labelsAsTags: dimensionsLabelsAsTags
         )
     }

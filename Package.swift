@@ -10,8 +10,9 @@ let package = Package(
         .iOS(.v14),
     ],
     products: [
-        .library(name: "SwiftInfluxDBLogs", targets: ["SwiftInfluxDBLogs"]),
-        .library(name: "SwiftInfluxDBMetrics", targets: ["SwiftInfluxDBMetrics"]),
+        .library(name: "InfluxDBLogs", targets: ["InfluxDBLogs"]),
+        .library(name: "InfluxDBMetrics", targets: ["InfluxDBMetrics"]),
+        .library(name: "InfluxDBAnalytics", targets: ["InfluxDBAnalytics"]),
     ],
     dependencies: [
         .package(url: "https://github.com/influxdata/influxdb-client-swift.git", from: "1.6.0"),
@@ -22,14 +23,14 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "SwiftInfluxDBLogs",
+            name: "InfluxDBLogs",
             dependencies: [
                 .product(name: "Logging", package: "swift-log"),
                 .target(name: "SwiftInfluxDBCore")
             ]
         ),
         .target(
-            name: "SwiftInfluxDBMetrics",
+            name: "InfluxDBMetrics",
             dependencies: [
                 .product(name: "Metrics", package: "swift-metrics"),
                 .product(name: "Atomics", package: "swift-atomics"),
@@ -37,7 +38,7 @@ let package = Package(
             ]
         ),
         .target(
-            name: "SwiftInfluxDBAnalytics",
+            name: "InfluxDBAnalytics",
             dependencies: [
                 .product(name: "SwiftAnalytics", package: "swift-analytics"),
                 .target(name: "SwiftInfluxDBCore")

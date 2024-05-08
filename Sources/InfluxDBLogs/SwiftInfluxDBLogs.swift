@@ -1,6 +1,7 @@
 import Logging
 import InfluxDBSwift
 @_exported import SwiftInfluxDBCore
+import Foundation
 
 /// InfluxDB Log Handler.
 /// `InfluxDBLogHandler` constructs a measurement for each log entry, using the logger's name as the measurement name.
@@ -37,6 +38,7 @@ public struct InfluxDBLogHandler: LogHandler {
     public var logLevel: Logger.Level
     public var name: String
     private let api: InfluxDBWriter
+    private let uuid = UUID()
     
     /// Create a new `InfluxDBLogHandler`.
     /// - Parameters:
@@ -93,7 +95,8 @@ public struct InfluxDBLogHandler: LogHandler {
             measurement: name,
             tags: [:],
             fields: ["message": .string(message.description)],
-            unspecified: data
+            unspecified: data, 
+            measurementID: uuid
         )
     }
 }

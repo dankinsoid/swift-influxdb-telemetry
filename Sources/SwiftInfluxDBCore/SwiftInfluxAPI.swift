@@ -34,14 +34,17 @@ public struct InfluxDBWriterConfigs: Equatable, @unchecked Sendable {
 package struct InfluxDBWriter: Sendable {
 
     package let labelsAsTags: LabelsSet
+    package let intervalType: IntervalType
     private let api: SwiftInfluxAPI
 
     package init(
         client: InfluxDBClient,
         configs: InfluxDBWriterConfigs,
+        intervalType: IntervalType = .irregular,
         labelsAsTags: LabelsSet
     ) {
         self.labelsAsTags = labelsAsTags
+        self.intervalType = intervalType
         self.api = .make(
             client: client,
             configs: configs
@@ -61,24 +64,43 @@ package struct InfluxDBWriter: Sendable {
         tags: [String: String],
         fields: [String: InfluxDBClient.Point.FieldValue],
         unspecified: [(String, InfluxDBClient.Point.FieldValue)],
+        measurementID: UUID,
         date: Date = Date()
     ) {
-        Task {
-            let point = InfluxDBClient.Point(measurement).time(time: .date(date))
-            for (key, value) in unspecified {
-                if labelsAsTags.contains(key) {
-                    point.addTag(key: key, value: value.string)
-                } else {
-                    point.addField(key: key, value: value)
-                }
-            }
-            for (key, value) in tags {
-                point.addTag(key: key, value: value)
-            }
-            for (key, value) in fields {
+        let point = InfluxDBClient.Point(measurement)
+        for (key, value) in unspecified {
+            if labelsAsTags.contains(key) {
+                point.addTag(key: key, value: value.string)
+            } else {
                 point.addField(key: key, value: value)
             }
-            await api.add(point: point)
+        }
+        for (key, value) in tags {
+            point.addTag(key: key, value: value)
+        }
+        for (key, value) in fields {
+            point.addField(key: key, value: value)
+        }
+        let nextPoint: @Sendable (Date) -> InfluxDBClient.Point = { date in
+            point.time(time: .date(date))
+        }
+        switch intervalType {
+        case .irregular:
+            Task {
+                await api.add(point: nextPoint(date))
+            }
+        case let .regular(seconds):
+            Task {
+                await api.addToTimer(interval: seconds, id: measurementID, startTime: date, point: nextPoint)
+            }
+        }
+    }
+
+    package func close(measurementID: UUID) {
+        Task {
+            if case let .regular(seconds) = intervalType {
+                await api.removeFromTimer(interval: seconds, id: measurementID)
+            }
         }
     }
 }
@@ -92,6 +114,7 @@ private final actor SwiftInfluxAPI: Sendable {
     private let responsesQueue: DispatchQueue
     private var points: [InfluxDBClient.Point]
     private var writeTask: Task<Void, Error>?
+    private var timers: [TimeInterval: (Task<Void, Error>, [UUID: (Date) -> InfluxDBClient.Point])] = [:]
 
     static func make(
         client: InfluxDBClient,
@@ -118,7 +141,7 @@ private final actor SwiftInfluxAPI: Sendable {
         var points: [InfluxDBClient.Point] = []
         points.reserveCapacity(configs.batchSize)
         self.points = points
-        responsesQueue =  DispatchQueue(label: "SwiftInfluxAPI.responsesQueue.\(configs.bucket)", qos: .background)
+        responsesQueue =  DispatchQueue(label: "InfluxDB.responsesQueue.\(configs.bucket)", qos: .background)
     }
 
     func load(
@@ -146,6 +169,55 @@ from(bucket: "\(configs.bucket)")
     func add(point: InfluxDBClient.Point) async {
         points.append(point)
         await writeIfNeeded()
+    }
+    
+    func addToTimer(
+        interval: TimeInterval,
+        id: UUID,
+        startTime: Date,
+        point: @escaping @Sendable (Date) -> InfluxDBClient.Point
+    ) {
+        if let (task, points) = timers[interval] {
+            var points = points
+            points[id] = point
+            timers[interval] = (task, points)
+        } else {
+            let task = Task { [weak self] in
+                let intervalInNanoSeconds = UInt64(interval * 1_000_000_000)
+                var i: UInt64 = 0
+                while !Task.isCancelled {
+                    let date = Date(timeIntervalSince1970: startTime.timeIntervalSince1970 + Double(i) * interval)
+                    Task { [weak self] in
+                        if let points = await self?.timerPoints(interval: interval) {
+                            for point in points {
+                                try Task.checkCancellation()
+                                await self?.add(point: point(date))
+                            }
+                        }
+                    }
+                    try await Task.sleep(nanoseconds: intervalInNanoSeconds)
+                    i += 1
+                }
+            }
+            timers[interval] = (task, [id: point])
+        }
+    }
+
+    func removeFromTimer(interval: TimeInterval, id: UUID) {
+        if let (task, points) = timers[interval] {
+            var points = points
+            points.removeValue(forKey: id)
+            if points.isEmpty {
+                task.cancel()
+                timers.removeValue(forKey: interval)
+            } else {
+                timers[interval] = (task, points)
+            }
+        }
+    }
+
+    private func timerPoints(interval: TimeInterval) -> [(Date) -> InfluxDBClient.Point] {
+        timers[interval]?.1.map(\.value) ?? []
     }
 
     private func writeIfNeeded() async {

@@ -15,8 +15,7 @@ The `InfluxDBMetricsFactory` is designed for metric collection, while the `Influ
 ### Setting Up Metrics Factory
 
 ```swift
-import InfluxDBSwift
-import SwiftInfluxDBMetrics
+import InfluxDBMetrics
 
 let client = InfluxDBClient(url: "your-influxdb-url", token: "your-auth-token")
 
@@ -36,8 +35,7 @@ MetricsSystem.bootstrap(
 ### Setting Up Log Handler
 
 ```swift
-import InfluxDBSwift
-import SwiftInfluxDBLogs
+import InfluxDBLogs
 
 let client = InfluxDBClient(url: "your-influxdb-url", token: "your-auth-token")
         
