@@ -6,54 +6,45 @@ import Foundation
 /// InfluxDB Log Handler.
 /// `InfluxDBLogHandler` constructs a measurement for each log entry, using the logger's name as the measurement name.
 /// Log messages are stored in the `message` field, while log metadata may either be stored as fields or tags, based on the `metadataLabelsAsTags` parameter.
-/// Default metadata such as `file`, `source`, `log_level`, etc., can be indexed as tags; these defaults are modifiable via the `metadataLabelsAsTags` parameter.
-/// Default metadata labels are defined in the `String.InfluxDBLogHandlerLabels` namespace as static constants.
+/// Default metadata labels are defined in the `String.InfluxDBLogLabels` namespace as static constants.
 ///
 /// Usage:
 /// ```swift
 /// LoggingSystem.bootstrap { name in
 ///     InfluxDBLogHandler(
 ///         name: name,
-///         bucket: "your-bucket-name",
+///         url: "http://localhost:8086",
+///         token: "your-token",
 ///         org: "your-org-name",
-///         client: client,
+///         bucket: "your-bucket-name",
 ///         precision: .ms, // Optional
 ///         batchSize: 5000, // Optional
 ///         throttleInterval: 5, // Optional
-///         metadataLabelsAsTags: InfluxDBLogHandler.defaultMetadataLabelsAsTags.union([.InfluxDBLogHandlerLabels.file]), // Optional
+///         metadataLabelsAsTags: LabelsSet.loggingDefault.union([.InfluxDBLogLabels.file]), // Optional
 ///         logLevel: .info, // Optional
 ///         metadata: [:] // Optional
 ///     )
 /// }
 /// ```
 public struct InfluxDBLogHandler: LogHandler {
-    
-    /// Default metadata labels as tags.
-    public static let defaultMetadataLabelsAsTags: LabelsSet = [
-        .InfluxDBLogHandlerLabels.source,
-        .InfluxDBLogHandlerLabels.log_level
-    ]
-    
+
     public var metadata: Logger.Metadata
     public var logLevel: Logger.Level
     public var name: String
     private let api: InfluxDBWriter
     private let uuid = UUID()
-    
+
     /// Create a new `InfluxDBLogHandler`.
     /// - Parameters:
     ///   - name: The logger name. Logger name used as a measurement name in InfluxDB.
-    ///   - client: The InfluxDB client to use.
-    ///   - configs: The InfluxDB writer configurations.
+    ///   - options: The InfluxDB writer options.
     ///   - metadataLabelsAsTags: The set of metadata labels to use as tags. Defaults to ["source", "log_level"].
     ///   - logLevel: The log level to use. Defaults to `.info`.
     ///   - metadata: The metadata to use. Defaults to `[:]`.
-    /// - Important: You should call `client.close()` at the end of your application to release allocated resources.
     public init(
         name: String,
-        client: InfluxDBClient,
-        configs: InfluxDBWriterConfigs,
-        metadataLabelsAsTags: LabelsSet = Self.defaultMetadataLabelsAsTags,
+        options: BucketWriterOptions,
+        metadataLabelsAsTags: LabelsSet = .loggingDefault,
         logLevel: Logger.Level = .info,
         metadata: Logger.Metadata = [:]
     ) {
@@ -61,17 +52,80 @@ public struct InfluxDBLogHandler: LogHandler {
         self.logLevel = logLevel
         self.name = name
         api = InfluxDBWriter(
-            client: client,
-            configs: configs,
+            options: options,
             labelsAsTags: metadataLabelsAsTags
         )
     }
-    
+
+    /// Create a new `InfluxDBLogHandler`.
+    /// - Parameters:
+    ///   - name: The logger name. Logger name used as a measurement name in InfluxDB.
+    ///   - url: InfluxDB host and port.
+    ///   - token: Authentication token.
+    ///   - org: The InfluxDB organization.
+    ///   - bucket: The InfluxDB bucket.
+    ///   - precision: Precision for the unix timestamps within the body line-protocol.
+    ///   - batchSize: The maximum number of points to batch before writing to InfluxDB. Defaults to 5000.
+    ///   - throttleInterval: The maximum number of seconds to wait before writing a batch of points. Defaults to 5.
+    ///   - timeoutIntervalForRequest: Timeout interval to use when waiting for additional data.
+    ///   - timeoutIntervalForResource: Maximum amount of time that a resource request should be allowed to take.
+    ///   - enableGzip: Enable Gzip compression for HTTP requests.
+    ///   - connectionProxyDictionary: Enable Gzip compression for HTTP requests.
+    ///   - urlSessionDelegate: A delegate to handle HTTP session-level events.
+    ///   - debugging: optional Enable debugging for HTTP request/response. Default `false`.
+    ///   - protocolClasses: optional array of extra protocol subclasses that handle requests.
+    ///   - metadataLabelsAsTags: The set of metadata labels to use as tags. Defaults to ["source", "log_level"].
+    ///   - logLevel: The log level to use. Defaults to `.info`.
+    ///   - metadata: The metadata to use. Defaults to `[:]`.
+    public init(
+        name: String,
+        url: String,
+        token: String,
+        org: String,
+        bucket: String,
+        precision: InfluxDBClient.TimestampPrecision = InfluxDBClient.defaultTimestampPrecision,
+        batchSize: Int = 5000,
+        throttleInterval: UInt16 = 5,
+        timeoutIntervalForRequest: TimeInterval = 60,
+        timeoutIntervalForResource: TimeInterval = 60 * 5,
+        enableGzip: Bool = false,
+        connectionProxyDictionary: [AnyHashable: Any]? = nil,
+        urlSessionDelegate: URLSessionDelegate? = nil,
+        debugging: Bool? = nil,
+        protocolClasses: [AnyClass]? = nil,
+        metadataLabelsAsTags: LabelsSet = .loggingDefault,
+        logLevel: Logger.Level = .info,
+        metadata: Logger.Metadata = [:]
+    ) {
+        self.init(
+            name: name,
+            options: BucketWriterOptions(
+                url: url,
+                token: token,
+                org: org,
+                bucket: bucket,
+                precision: precision,
+                batchSize: batchSize,
+                throttleInterval: throttleInterval,
+                timeoutIntervalForRequest: timeoutIntervalForRequest,
+                timeoutIntervalForResource: timeoutIntervalForResource,
+                enableGzip: enableGzip,
+                connectionProxyDictionary: connectionProxyDictionary,
+                urlSessionDelegate: urlSessionDelegate,
+                debugging: debugging,
+                protocolClasses: protocolClasses
+            ),
+            metadataLabelsAsTags: metadataLabelsAsTags,
+            logLevel: logLevel,
+            metadata: metadata
+        )
+    }
+
     public subscript(metadataKey key: String) -> Logger.Metadata.Value? {
         get { metadata[key] }
         set { metadata[key] = newValue }
     }
-    
+
     public func log(
         level: Logger.Level,
         message: Logger.Message,
@@ -82,11 +136,11 @@ public struct InfluxDBLogHandler: LogHandler {
         line: UInt
     ) {
         let data: [(String, InfluxDBClient.Point.FieldValue)] = [
-            (.InfluxDBLogHandlerLabels.line, .uint(line)),
-            (.InfluxDBLogHandlerLabels.function, .string(function)),
-            (.InfluxDBLogHandlerLabels.file, .string(file)),
-            (.InfluxDBLogHandlerLabels.source, .string(source)),
-            (.InfluxDBLogHandlerLabels.log_level, .string(level.rawValue.uppercased()))
+            (.InfluxDBLogLabels.line, .uint(line)),
+            (.InfluxDBLogLabels.function, .string(function)),
+            (.InfluxDBLogLabels.file, .string(file)),
+            (.InfluxDBLogLabels.source, .string(source)),
+            (.InfluxDBLogLabels.log_level, .string(level.rawValue.uppercased()))
         ] + self.metadata
             .merging(metadata ?? [:]) { _, new in new }
             .map { ($0.key, $0.value.fieldValue) }
@@ -102,9 +156,9 @@ public struct InfluxDBLogHandler: LogHandler {
 }
 
 public extension String {
-    
-    enum InfluxDBLogHandlerLabels {
-        
+
+    enum InfluxDBLogLabels {
+
         static let log_level = "log_level"
         static let source = "source"
         static let line = "line"
@@ -113,8 +167,16 @@ public extension String {
     }
 }
 
-private extension Logger.MetadataValue {
+public extension LabelsSet {
     
+    static let loggingDefault: LabelsSet = [
+        .InfluxDBLogLabels.source,
+        .InfluxDBLogLabels.log_level
+    ]
+}
+
+private extension Logger.MetadataValue {
+
     var fieldValue: InfluxDBClient.Point.FieldValue {
         switch self {
         case .string(let value): return .string(value)

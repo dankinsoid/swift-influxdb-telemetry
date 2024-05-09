@@ -1,33 +1,142 @@
 import Foundation
 @_exported import InfluxDBSwift
 
-public struct InfluxDBWriterConfigs: Equatable, @unchecked Sendable {
+public struct BucketWriterOptions: @unchecked Sendable {
 
+    public let client: InfluxDBClient
     public var bucket: String
     public var org: String
-    public var precision: InfluxDBClient.TimestampPrecision
     public var batchSize: Int
     public var throttleInterval: UInt16
 
-    /// Create a new `InfluxDBWriterConfigs`.
+    /// Create a new `BucketWriterOptions`.
     /// - Parameters:
-    ///   - bucket: The InfluxDB bucket to use.
     ///   - client: The InfluxDB client to use.
-    ///   - precision: The timestamp precision to use. Defaults to milliseconds.
+    ///   - org: The InfluxDB organization.   
+    ///   - bucket: The InfluxDB bucket.
     ///   - batchSize: The maximum number of points to batch before writing to InfluxDB. Defaults to 5000.
     ///   - throttleInterval: The maximum number of seconds to wait before writing a batch of points. Defaults to 5.
     public init(
-        bucket: String,
+        client: InfluxDBClient,
         org: String,
-        precision: InfluxDBClient.TimestampPrecision = .ms,
+        bucket: String,
         batchSize: Int = 5000,
         throttleInterval: UInt16 = 5
     ) {
+        self.client = client
         self.bucket = bucket
         self.org = org
-        self.precision = precision
         self.batchSize = batchSize
         self.throttleInterval = throttleInterval
+    }
+    
+    /// Create a new `BucketWriterOptions`.
+    ///
+    /// - Parameters:
+    ///   - url: InfluxDB host and port.
+    ///   - token: Authentication token.
+    ///   - org: The InfluxDB organization.
+    ///   - bucket: The InfluxDB bucket.
+    ///   - precision: Precision for the unix timestamps within the body line-protocol.
+    ///   - batchSize: The maximum number of points to batch before writing to InfluxDB. Defaults to 5000.
+    ///   - throttleInterval: The maximum number of seconds to wait before writing a batch of points. Defaults to 5.
+    ///   - timeoutIntervalForRequest: Timeout interval to use when waiting for additional data.
+    ///   - timeoutIntervalForResource: Maximum amount of time that a resource request should be allowed to take.
+    ///   - enableGzip: Enable Gzip compression for HTTP requests.
+    ///   - connectionProxyDictionary: Enable Gzip compression for HTTP requests.
+    ///   - urlSessionDelegate: A delegate to handle HTTP session-level events.
+    ///   - debugging: optional Enable debugging for HTTP request/response. Default `false`.
+    ///   - protocolClasses: optional array of extra protocol subclasses that handle requests.
+    public init(
+        url: String,
+        token: String,
+        org: String,
+        bucket: String,
+        precision: InfluxDBClient.TimestampPrecision = InfluxDBClient.defaultTimestampPrecision,
+        batchSize: Int = 5000,
+        throttleInterval: UInt16 = 5,
+        timeoutIntervalForRequest: TimeInterval = 60,
+        timeoutIntervalForResource: TimeInterval = 60 * 5,
+        enableGzip: Bool = false,
+        connectionProxyDictionary: [AnyHashable: Any]? = nil,
+        urlSessionDelegate: URLSessionDelegate? = nil,
+        debugging: Bool? = nil,
+        protocolClasses: [AnyClass]? = nil
+    ) {
+        self.init(
+            client: InfluxDBClient(
+                url: url,
+                token: token,
+                options: InfluxDBClient.InfluxDBOptions(
+                    precision: precision,
+                    timeoutIntervalForRequest: timeoutIntervalForRequest,
+                    timeoutIntervalForResource: timeoutIntervalForResource,
+                    enableGzip: enableGzip,
+                    connectionProxyDictionary: connectionProxyDictionary,
+                    urlSessionDelegate: urlSessionDelegate
+                ),
+                debugging: debugging,
+                protocolClasses: protocolClasses
+            ),
+            org: org,
+            bucket: bucket
+        )
+    }
+
+    /// Create a new `BucketWriterOptions`.
+    ///
+    /// - Parameters:
+    ///   - url: InfluxDB host and port.
+    ///   - username: Username for authentication.
+    ///   - password: Password for authentication
+    ///   - org: The InfluxDB organization.
+    ///   - database: Target database.
+    ///   - retentionPolicy: Target retention policy.
+    ///   - bucket: The InfluxDB bucket.
+    ///   - precision: Precision for the unix timestamps within the body line-protocol.
+    ///   - batchSize: The maximum number of points to batch before writing to InfluxDB. Defaults to 5000.
+    ///   - throttleInterval: The maximum number of seconds to wait before writing a batch of points. Defaults to 5.
+    ///   - timeoutIntervalForRequest: Timeout interval to use when waiting for additional data.
+    ///   - timeoutIntervalForResource: Maximum amount of time that a resource request should be allowed to take.
+    ///   - enableGzip: Enable Gzip compression for HTTP requests.
+    ///   - connectionProxyDictionary: Enable Gzip compression for HTTP requests.
+    ///   - urlSessionDelegate: A delegate to handle HTTP session-level events.
+    ///   - debugging: optional Enable debugging for HTTP request/response. Default `false`.
+    ///   - protocolClasses: optional array of extra protocol subclasses that handle requests.
+    public init(
+        url: String,
+        username: String,
+        password: String,
+        org: String,
+        database: String,
+        retentionPolicy: String,
+        precision: InfluxDBClient.TimestampPrecision = InfluxDBClient.defaultTimestampPrecision,
+        batchSize: Int = 5000,
+        throttleInterval: UInt16 = 5,
+        timeoutIntervalForRequest: TimeInterval = 60,
+        timeoutIntervalForResource: TimeInterval = 60 * 5,
+        enableGzip: Bool = false,
+        connectionProxyDictionary: [AnyHashable: Any]? = nil,
+        urlSessionDelegate: URLSessionDelegate? = nil,
+        debugging: Bool? = nil,
+        protocolClasses: [AnyClass]? = nil
+    ) {
+        self.init(
+            url: url,
+            token: "\(username):\(password)",
+            org: org,
+            bucket: "\(database)/\(retentionPolicy)",
+            precision: precision,
+            batchSize: batchSize,
+            throttleInterval: throttleInterval,
+            timeoutIntervalForRequest: timeoutIntervalForRequest,
+            timeoutIntervalForResource: timeoutIntervalForResource,
+            enableGzip: enableGzip,
+            connectionProxyDictionary: connectionProxyDictionary,
+            urlSessionDelegate: urlSessionDelegate,
+        	debugging: debugging,
+        	protocolClasses: protocolClasses
+        )
     }
 }
 
@@ -38,17 +147,13 @@ package struct InfluxDBWriter: Sendable {
     private let api: SwiftInfluxAPI
 
     package init(
-        client: InfluxDBClient,
-        configs: InfluxDBWriterConfigs,
+        options: BucketWriterOptions,
         intervalType: IntervalType = .irregular,
         labelsAsTags: LabelsSet
     ) {
         self.labelsAsTags = labelsAsTags
         self.intervalType = intervalType
-        self.api = .make(
-            client: client,
-            configs: configs
-        )
+        self.api = .make(options: options)
     }
 
     package func load(
@@ -107,41 +212,32 @@ package struct InfluxDBWriter: Sendable {
 
 private final actor SwiftInfluxAPI: Sendable {
 
-    private static var cache: [String: SwiftInfluxAPI] = [:]
+    private static let cache = NIOLockedValueBox([BatcherID: SwiftInfluxAPI]())
 
-    nonisolated let client: InfluxDBClient
-    nonisolated let configs: InfluxDBWriterConfigs
+    nonisolated let options: BucketWriterOptions
     private let responsesQueue: DispatchQueue
     private var points: [InfluxDBClient.Point]
     private var writeTask: Task<Void, Error>?
     private var timers: [TimeInterval: (Task<Void, Error>, [UUID: (Date) -> InfluxDBClient.Point])] = [:]
 
-    static func make(
-        client: InfluxDBClient,
-        configs: InfluxDBWriterConfigs
-    ) -> SwiftInfluxAPI {
-        let key = client.url
-        if let api = cache[key] {
+    static func make(options: BucketWriterOptions) -> SwiftInfluxAPI {
+        cache.withLockedValue { cache in
+            let key = BatcherID(url: options.client.url, bucket: options.bucket, org: options.org)
+            if let api = cache[key] {
+                return api
+            }
+            let api = SwiftInfluxAPI(options: options)
+            cache[key] = api
             return api
         }
-        let api = SwiftInfluxAPI(
-            client: client,
-            configs: configs
-        )
-        cache[key] = api
-        return api
     }
 
-    private init(
-        client: InfluxDBClient,
-        configs: InfluxDBWriterConfigs
-    ) {
-        self.client = client
-        self.configs = configs
+    private init(options: BucketWriterOptions) {
+        self.options = options
         var points: [InfluxDBClient.Point] = []
-        points.reserveCapacity(configs.batchSize)
+        points.reserveCapacity(options.batchSize)
         self.points = points
-        responsesQueue =  DispatchQueue(label: "InfluxDB.responsesQueue.\(configs.bucket)", qos: .background)
+        responsesQueue =  DispatchQueue(label: "InfluxDB.\(options.org).\(options.bucket)", qos: .background)
     }
 
     func load(
@@ -152,15 +248,15 @@ private final actor SwiftInfluxAPI: Sendable {
         let filter = ([("_measurement", measurement)] + tags.sorted(by: { $0.key < $1.key }) + fields.map { ("_field", $0) })
             .map { "  |> filter(fn: (r) => r.\($0.key) == \"\($0.value)\")" }
             .joined(separator: "\n")
-        
-        return try await client.queryAPI.query(
+
+        return try await options.client.queryAPI.query(
             query: """
-from(bucket: "\(configs.bucket)")
+from(bucket: "\(options.bucket)")
   |> range(start: -30d)
 \(filter)
   |> last()
 """,
-            org: configs.org,
+            org: options.org,
             responseQueue: responsesQueue
         )
         .next()
@@ -170,7 +266,7 @@ from(bucket: "\(configs.bucket)")
         points.append(point)
         await writeIfNeeded()
     }
-    
+
     func addToTimer(
         interval: TimeInterval,
         id: UUID,
@@ -222,12 +318,12 @@ from(bucket: "\(configs.bucket)")
 
     private func writeIfNeeded() async {
         guard !points.isEmpty else { return }
-        if points.count >= configs.batchSize {
+        if points.count >= options.batchSize {
             writeTask?.cancel()
             await write()
         } else if writeTask == nil {
-            writeTask = Task { [weak self, configs] in
-                try await Task.sleep(nanoseconds: UInt64(configs.throttleInterval) * 1_000_000_000)
+            writeTask = Task { [weak self, options] in
+                try await Task.sleep(nanoseconds: UInt64(options.throttleInterval) * 1_000_000_000)
                 await self?.write()
             }
         }
@@ -236,19 +332,18 @@ from(bucket: "\(configs.bucket)")
     private func write() async {
         writeTask = nil
         var points = self.points
-        let largerThanBatch = points.count > configs.batchSize
+        let largerThanBatch = points.count > options.batchSize
         self.points.removeAll(keepingCapacity: !largerThanBatch)
         if largerThanBatch {
-            self.points.reserveCapacity(configs.batchSize)
+            self.points.reserveCapacity(options.batchSize)
         }
         do {
             while !points.isEmpty {
-                let batch = Array(points[0 ..< min(configs.batchSize, points.count)])
-                try await client.makeWriteAPI()
+                let batch = Array(points[0 ..< min(options.batchSize, points.count)])
+                try await options.client.makeWriteAPI()
                     .write(
-                        bucket: configs.bucket,
-                        org: configs.org,
-                        precision: configs.precision,
+                        bucket: options.bucket,
+                        org: options.org,
                         points: batch,
                         responseQueue: responsesQueue
                     )
@@ -263,7 +358,7 @@ from(bucket: "\(configs.bucket)")
 }
 
 private extension InfluxDBClient.Point.FieldValue {
-    
+
     var string: String {
         switch self {
         case .boolean(let value):
@@ -280,3 +375,9 @@ private extension InfluxDBClient.Point.FieldValue {
     }
 }
 
+private struct BatcherID: Hashable {
+    
+    let url: String
+    var bucket: String
+    var org: String
+}

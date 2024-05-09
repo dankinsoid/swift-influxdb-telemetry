@@ -3,64 +3,114 @@ import InfluxDBSwift
 @_exported import SwiftInfluxDBCore
 import Foundation
 
-/// InfluxDB Log Handler.
-/// `InfluxDBAnalyticsHandler` constructs a measurement for all events, using the event's name as the measurement name.
+/// InfluxDB Analytics Handler.
+/// `InfluxDBAnalyticsHandler` constructs measurements for events, using the event's name as the measurement name.
 /// Event parameters may either be stored as fields or tags, based on the `parametersLabelsAsTags` parameter.
-/// Default parameters such as `fileID`, `source`, etc., can be indexed as tags; these defaults are modifiable via the `parametersLabelsAsTags` parameter.
-/// Default parameters labels are defined in the `String.InfluxDBAnalyticsHandlerLabels` namespace as static constants.
+/// Default parameters labels are defined in the `String.InfluxDBAnalyticsLabels` namespace as static constants.
 ///
 /// Usage:
 /// ```swift
 /// AnalyticsSystem.bootstrap(
-///     InfluxDBLogHandler(
-///         bucket: "your-bucket-name",
+///     InfluxDBAnalyticsHandler(
+///         url: "http://localhost:8086",
+///         token: "your-token",
 ///         org: "your-org-name",
-///         client: client,
+///         bucket: "your-bucket-name",
 ///         precision: .ms, // Optional
 ///         batchSize: 5000, // Optional
 ///         throttleInterval: 5, // Optional
-///         parametersLabelsAsTags: InfluxDBLogHandler.defaultMetadataLabelsAsTags.union([.InfluxDBLogHandlerLabels.file]) // Optional
+///         parametersLabelsAsTags: LabelsSet.analyticsDefault.union([.InfluxDBAnalyticsLabels.file]) // Optional
 ///     )
 /// )
 /// ```
 public struct InfluxDBAnalyticsHandler: AnalyticsHandler {
 
-    /// Default metadata labels as tags.
-    public static let defaultMetadataLabelsAsTags: LabelsSet = [
-        .InfluxDBAnalyticsHandlerLabels.source
-    ]
-
     public var parameters: Analytics.Parameters
 
     private let api: InfluxDBWriter
     private let uuid = UUID()
-    
+
     /// Create a new `InfluxDBAnalyticsHandler`.
     /// - Parameters:
-    ///   - client: The InfluxDB client to use.
-    ///   - configs: The InfluxDB writer configurations.
-    ///   - parametersLabelsAsTags: The set of metadata labels to use as tags. Defaults to ["source", "log_level"].
-    /// - Important: You should call `client.close()` at the end of your application to release allocated resources.
+    ///   - options: The InfluxDB writer options.
+    ///   - parametersLabelsAsTags: The set of metadata labels to use as tags. Defaults to ["source"].
+    ///   - parameters: Global parameters for all events. Defaults to `[:]`.
     public init(
-        client: InfluxDBClient,
-        configs: InfluxDBWriterConfigs,
-        parametersLabelsAsTags: LabelsSet = Self.defaultMetadataLabelsAsTags,
+        options: BucketWriterOptions,
+        parametersLabelsAsTags: LabelsSet = .analyticsDefault,
         parameters: Analytics.Parameters = [:]
     ) {
         api = InfluxDBWriter(
-            client: client,
-            configs: configs,
+            options: options,
             labelsAsTags: parametersLabelsAsTags
         )
         self.parameters = parameters
     }
 
+    /// Create a new `InfluxDBAnalyticsHandler`.
+    /// - Parameters:
+    ///   - url: InfluxDB host and port.
+    ///   - token: Authentication token.
+    ///   - org: The InfluxDB organization.
+    ///   - bucket: The InfluxDB bucket.
+    ///   - precision: Precision for the unix timestamps within the body line-protocol.
+    ///   - batchSize: The maximum number of points to batch before writing to InfluxDB. Defaults to 5000.
+    ///   - throttleInterval: The maximum number of seconds to wait before writing a batch of points. Defaults to 5.
+    ///   - timeoutIntervalForRequest: Timeout interval to use when waiting for additional data.
+    ///   - timeoutIntervalForResource: Maximum amount of time that a resource request should be allowed to take.
+    ///   - enableGzip: Enable Gzip compression for HTTP requests.
+    ///   - connectionProxyDictionary: Enable Gzip compression for HTTP requests.
+    ///   - urlSessionDelegate: A delegate to handle HTTP session-level events.
+    ///   - debugging: optional Enable debugging for HTTP request/response. Default `false`.
+    ///   - protocolClasses: optional array of extra protocol subclasses that handle requests.   
+    ///   - parametersLabelsAsTags: The set of metadata labels to use as tags. Defaults to ["source"].
+    ///   - parameters: Global parameters for all events. Defaults to `[:]`.
+    public init(
+        url: String,
+        token: String,
+        org: String,
+        bucket: String,
+        precision: InfluxDBClient.TimestampPrecision = InfluxDBClient.defaultTimestampPrecision,
+        batchSize: Int = 5000,
+        throttleInterval: UInt16 = 5,
+        timeoutIntervalForRequest: TimeInterval = 60,
+        timeoutIntervalForResource: TimeInterval = 60 * 5,
+        enableGzip: Bool = false,
+        connectionProxyDictionary: [AnyHashable: Any]? = nil,
+        urlSessionDelegate: URLSessionDelegate? = nil,
+        debugging: Bool? = nil,
+        protocolClasses: [AnyClass]? = nil,
+        parametersLabelsAsTags: LabelsSet = .analyticsDefault,
+        parameters: Analytics.Parameters = [:]
+    ) {
+        self.init(
+            options: BucketWriterOptions(
+                url: url,
+                token: token,
+                org: org,
+                bucket: bucket,
+                precision: precision,
+                batchSize: batchSize,
+                throttleInterval: throttleInterval,
+                timeoutIntervalForRequest: timeoutIntervalForRequest,
+                timeoutIntervalForResource: timeoutIntervalForResource,
+                enableGzip: enableGzip,
+                connectionProxyDictionary: connectionProxyDictionary,
+                urlSessionDelegate: urlSessionDelegate,
+                debugging: debugging,
+                protocolClasses: protocolClasses
+            ),
+            parametersLabelsAsTags: parametersLabelsAsTags,
+            parameters: parameters
+        )
+    }
+
     public func send(event: Analytics.Event, file: String, function: String, line: UInt, source: String) {
         let data: [(String, InfluxDBClient.Point.FieldValue)] = [
-            (.InfluxDBAnalyticsHandlerLabels.line, .uint(line)),
-            (.InfluxDBAnalyticsHandlerLabels.function, .string(function)),
-            (.InfluxDBAnalyticsHandlerLabels.file, .string(file)),
-            (.InfluxDBAnalyticsHandlerLabels.source, .string(source))
+            (.InfluxDBAnalyticsLabels.line, .uint(line)),
+            (.InfluxDBAnalyticsLabels.function, .string(function)),
+            (.InfluxDBAnalyticsLabels.file, .string(file)),
+            (.InfluxDBAnalyticsLabels.source, .string(source))
         ] + self.parameters
             .merging(event.parameters) { _, new in new }
             .map { ($0.key, $0.value.fieldValue) }
@@ -77,13 +127,20 @@ public struct InfluxDBAnalyticsHandler: AnalyticsHandler {
 
 public extension String {
 
-    enum InfluxDBAnalyticsHandlerLabels {
+    enum InfluxDBAnalyticsLabels {
 
         static let source = "source"
         static let line = "line"
         static let function = "function"
         static let file = "file"
     }
+}
+
+public extension LabelsSet {
+    
+    static let analyticsDefault: LabelsSet = [
+        .InfluxDBAnalyticsLabels.source
+    ]
 }
 
 private extension Analytics.ParametersValue {

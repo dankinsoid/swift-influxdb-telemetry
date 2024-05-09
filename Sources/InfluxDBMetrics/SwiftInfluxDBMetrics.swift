@@ -2,6 +2,7 @@ import CoreMetrics
 import InfluxDBSwift
 @_exported import SwiftInfluxDBCore
 import Logging
+import Foundation
 
 /// InfluxDB Metrics Factory.
 /// `InfluxDBMetricsFactory` creates a unique handler for each combination of metric types, labels, and tags.
@@ -26,24 +27,92 @@ public struct InfluxDBMetricsFactory: Sendable {
     
     private let api: InfluxDBWriter
     private let box = NIOLockedValueBox([HandlerID: InfluxMetric]())
+    private let dimensions: [(String, String)]
     
     /// Create a new `InfluxDBMetricsFactory`.
     /// - Parameters:
-    ///   - client: The InfluxDB client to use.
-    ///   - configs: The InfluxDB writer configurations.
+    ///   - options: The InfluxDB writer options.
+    ///   - intervalType: The interval type for the metrics. Can be `regular` or `irregular`.
+    ///   Difference between them you can found in [InfluxDB documentation](https://www.influxdata.com/blog/what-is-the-difference-between-metrics-and-events/).
+    ///   Regular interval type creates a timer with a fixed interval and sends all collected metrics every interval. Irregular interval type sends metrics only when they are triggered. Defaults to regular with 60 seconds interval.
     ///   - dimensionsLabelsAsTags: The set of labels to use as tags. Defaults to all.
-    /// - Important: You should call `client.close()` at the end of your application to release allocated resources.
+    ///   - dimensions: Global dimensions for all metrics. Defaults to `[]`.
     public init(
-        client: InfluxDBClient,
-        configs: InfluxDBWriterConfigs,
-        intervalType: IntervalType = .irregular,
-        dimensionsLabelsAsTags: LabelsSet = .all
+        options: BucketWriterOptions,
+        intervalType: IntervalType = .regular(seconds: 60),
+        dimensionsLabelsAsTags: LabelsSet = .all,
+        dimensions: [(String, String)] = []
     ) {
         api = InfluxDBWriter(
-            client: client,
-            configs: configs,
+            options: options,
             intervalType: intervalType,
             labelsAsTags: dimensionsLabelsAsTags
+        )
+        self.dimensions = dimensions
+    }
+
+    /// Create a new `InfluxDBMetricsFactory`.
+    /// - Parameters:
+    ///   - name: The logger name. Logger name used as a measurement name in InfluxDB.
+    ///   - url: InfluxDB host and port.
+    ///   - token: Authentication token.
+    ///   - org: The InfluxDB organization.
+    ///   - bucket: The InfluxDB bucket.
+    ///   - precision: Precision for the unix timestamps within the body line-protocol.
+    ///   - batchSize: The maximum number of points to batch before writing to InfluxDB. Defaults to 5000.
+    ///   - throttleInterval: The maximum number of seconds to wait before writing a batch of points. Defaults to 5.
+    ///   - timeoutIntervalForRequest: Timeout interval to use when waiting for additional data.
+    ///   - timeoutIntervalForResource: Maximum amount of time that a resource request should be allowed to take.
+    ///   - enableGzip: Enable Gzip compression for HTTP requests.
+    ///   - connectionProxyDictionary: Enable Gzip compression for HTTP requests.
+    ///   - urlSessionDelegate: A delegate to handle HTTP session-level events.
+    ///   - debugging: optional Enable debugging for HTTP request/response. Default `false`.
+    ///   - protocolClasses: optional array of extra protocol subclasses that handle requests.
+    ///   - intervalType: The interval type for the metrics. Can be `regular` or `irregular`.
+    ///   Difference between them you can found in [InfluxDB documentation](https://www.influxdata.com/blog/what-is-the-difference-between-metrics-and-events/).
+    ///   Regular interval type creates a timer with a fixed interval and sends all collected metrics every interval. Irregular interval type sends metrics only when they are triggered. Defaults to regular with 60 seconds interval.
+    ///   - dimensionsLabelsAsTags: The set of labels to use as tags. Defaults to all.
+    ///   - dimensions: Global dimensions for all metrics. Defaults to `[]`.
+    public init(
+        name: String,
+        url: String,
+        token: String,
+        org: String,
+        bucket: String,
+        precision: InfluxDBClient.TimestampPrecision = InfluxDBClient.defaultTimestampPrecision,
+        batchSize: Int = 5000,
+        throttleInterval: UInt16 = 5,
+        timeoutIntervalForRequest: TimeInterval = 60,
+        timeoutIntervalForResource: TimeInterval = 60 * 5,
+        enableGzip: Bool = false,
+        connectionProxyDictionary: [AnyHashable: Any]? = nil,
+        urlSessionDelegate: URLSessionDelegate? = nil,
+        debugging: Bool? = nil,
+        protocolClasses: [AnyClass]? = nil,
+        intervalType: IntervalType = .regular(seconds: 60),
+        dimensionsLabelsAsTags: LabelsSet = .all,
+        dimensions: [(String, String)] = []
+    ) {
+        self.init(
+            options: BucketWriterOptions(
+                url: url,
+                token: token,
+                org: org,
+                bucket: bucket,
+                precision: precision,
+                batchSize: batchSize,
+                throttleInterval: throttleInterval,
+                timeoutIntervalForRequest: timeoutIntervalForRequest,
+                timeoutIntervalForResource: timeoutIntervalForResource,
+                enableGzip: enableGzip,
+                connectionProxyDictionary: connectionProxyDictionary,
+                urlSessionDelegate: urlSessionDelegate,
+                debugging: debugging,
+                protocolClasses: protocolClasses
+            ),
+            intervalType: intervalType,
+            dimensionsLabelsAsTags: dimensionsLabelsAsTags,
+            dimensions: dimensions
         )
     }
 }
@@ -112,7 +181,7 @@ private extension InfluxDBMetricsFactory {
     @inline(__always)
     func makeHandler<H: InfluxMetric>(type: String, label: String, dimensions: [(String, String)], create: (HandlerID, [(String, String)]) -> H) -> H {
         box.withLockedValue { store -> H in
-            var dimensions = dimensions
+            var dimensions = self.dimensions + dimensions
             let id = HandlerID(label: label, type: type, dimensions: &dimensions, labelsAsTags: api.labelsAsTags)
             guard let value = store[id] as? H else {
                 if store[id] != nil {
