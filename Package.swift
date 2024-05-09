@@ -13,6 +13,7 @@ let package = Package(
         .library(name: "InfluxDBLogs", targets: ["InfluxDBLogs"]),
         .library(name: "InfluxDBMetrics", targets: ["InfluxDBMetrics"]),
         .library(name: "InfluxDBAnalytics", targets: ["InfluxDBAnalytics"]),
+        .library(name: "InfluxDBTracing", targets: ["InfluxDBTracing"]),
     ],
     dependencies: [
         .package(url: "https://github.com/influxdata/influxdb-client-swift.git", from: "1.6.0"),
@@ -20,6 +21,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-log.git", from: "1.5.0"),
         .package(url: "https://github.com/apple/swift-atomics.git", from: "1.2.0"),
         .package(url: "https://github.com/dankinsoid/swift-analytics.git", from: "1.2.0"),
+        .package(url: "https://github.com/apple/swift-distributed-tracing.git", from: "1.0.0")
     ],
     targets: [
         .target(
@@ -41,6 +43,14 @@ let package = Package(
             name: "InfluxDBAnalytics",
             dependencies: [
                 .product(name: "SwiftAnalytics", package: "swift-analytics"),
+                .target(name: "SwiftInfluxDBCore")
+            ]
+        ),
+        .target(
+            name: "InfluxDBTracing",
+            dependencies: [
+                .product(name: "Tracing", package: "swift-distributed-tracing"),
+                .product(name: "Instrumentation", package: "swift-distributed-tracing"),
                 .target(name: "SwiftInfluxDBCore")
             ]
         ),
