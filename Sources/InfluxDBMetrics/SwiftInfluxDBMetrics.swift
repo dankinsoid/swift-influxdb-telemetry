@@ -36,12 +36,12 @@ public struct InfluxDBMetricsFactory: Sendable {
     ///   - options: The InfluxDB writer options.
     ///   - intervalType: The interval type for the metrics. Can be `regular` or `irregular`.
     ///   Difference between them you can found in [InfluxDB documentation](https://www.influxdata.com/blog/what-is-the-difference-between-metrics-and-events/).
-    ///   Regular interval type creates a timer with a fixed interval and sends all collected metrics every interval. Irregular interval type sends metrics only when they are triggered. Defaults to regular with 60 seconds interval.
+    ///   Regular interval type creates a timer with a fixed interval and sends all collected metrics every interval. Irregular interval type sends metrics only when they are triggered. Defaults to irregular.
     ///   - dimensionsLabelsAsTags: The set of labels to use as tags. Defaults to all.
     ///   - dimensions: Global dimensions for all metrics. Defaults to `[]`.
     public init(
         options: BucketWriterOptions,
-        intervalType: IntervalType = .regular(seconds: 60),
+        intervalType: IntervalType = .irregular,
         dimensionsLabelsAsTags: LabelsSet = .all,
         dimensions: [(String, String)] = []
     ) {
@@ -71,7 +71,7 @@ public struct InfluxDBMetricsFactory: Sendable {
     ///   - protocolClasses: optional array of extra protocol subclasses that handle requests.
     ///   - intervalType: The interval type for the metrics. Can be `regular` or `irregular`.
     ///   Difference between them you can found in [InfluxDB documentation](https://www.influxdata.com/blog/what-is-the-difference-between-metrics-and-events/).
-    ///   Regular interval type creates a timer with a fixed interval and sends all collected metrics every interval. Irregular interval type sends metrics only when they are triggered. Defaults to regular with 60 seconds interval.
+    ///   Regular interval type creates a timer with a fixed interval and sends all collected metrics every interval. Irregular interval type sends metrics only when they are triggered. Defaults to irregular.
     ///   - dimensionsLabelsAsTags: The set of labels to use as tags. Defaults to all.
     ///   - dimensions: Global dimensions for all metrics. Defaults to `[]`.
     public init(
@@ -89,7 +89,7 @@ public struct InfluxDBMetricsFactory: Sendable {
         urlSessionDelegate: URLSessionDelegate? = nil,
         debugging: Bool? = nil,
         protocolClasses: [AnyClass]? = nil,
-        intervalType: IntervalType = .regular(seconds: 60),
+        intervalType: IntervalType = .irregular,
         dimensionsLabelsAsTags: LabelsSet = .all,
         dimensions: [(String, String)] = []
     ) {
