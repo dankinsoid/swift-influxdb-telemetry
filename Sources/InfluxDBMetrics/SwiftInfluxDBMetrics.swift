@@ -13,8 +13,10 @@ import Foundation
 /// ```swift
 /// MetricsSystem.bootstrap(
 ///     InfluxDBMetricsFactory(
-///         bucket: "your-bucket-name",
+///         url: "http://localhost:8086",
+///         token: "your-token",
 ///         org: "your-org-name",
+///         bucket: "your-bucket-name",
 ///         client: client,
 ///         precision: .ms, // Optional
 ///         batchSize: 5000, // Optional
@@ -24,11 +26,11 @@ import Foundation
 /// )
 /// ```
 public struct InfluxDBMetricsFactory: Sendable {
-    
+
     private let api: InfluxDBWriter
     private let box = NIOLockedValueBox([HandlerID: InfluxMetric]())
     private let dimensions: [(String, String)]
-    
+
     /// Create a new `InfluxDBMetricsFactory`.
     /// - Parameters:
     ///   - options: The InfluxDB writer options.
@@ -53,7 +55,6 @@ public struct InfluxDBMetricsFactory: Sendable {
 
     /// Create a new `InfluxDBMetricsFactory`.
     /// - Parameters:
-    ///   - name: The logger name. Logger name used as a measurement name in InfluxDB.
     ///   - url: InfluxDB host and port.
     ///   - token: Authentication token.
     ///   - org: The InfluxDB organization.
@@ -74,7 +75,6 @@ public struct InfluxDBMetricsFactory: Sendable {
     ///   - dimensionsLabelsAsTags: The set of labels to use as tags. Defaults to all.
     ///   - dimensions: Global dimensions for all metrics. Defaults to `[]`.
     public init(
-        name: String,
         url: String,
         token: String,
         org: String,
@@ -118,17 +118,17 @@ public struct InfluxDBMetricsFactory: Sendable {
 }
 
 extension InfluxDBMetricsFactory: MetricsFactory {
-    
+
     public func makeCounter(label: String, dimensions: [(String, String)]) -> CounterHandler {
         makeHandler(type: "counter", label: label, dimensions: dimensions) { id, fields in
             Counter(api: api, id: id, fields: fields)
         }
     }
-    
+
     public func makeFloatingPointCounter(label: String, dimensions: [(String, String)]) -> FloatingPointCounterHandler {
         makeFloatingPointCounter(type: "floating_counter", label: label, dimensions: dimensions)
     }
-    
+
     public func makeRecorder(
         label: String,
         dimensions: [(String, String)],
@@ -142,17 +142,17 @@ extension InfluxDBMetricsFactory: MetricsFactory {
             AggregateRecorder(api: api, id: id, fields: fields)
         }
     }
-    
+
     public func makeMeter(label: String, dimensions: [(String, String)]) -> MeterHandler {
         makeFloatingPointCounter(type: "meter", label: label, dimensions: dimensions)
     }
-    
+
     public func makeTimer(label: String, dimensions: [(String, String)]) -> TimerHandler {
         makeHandler(type: "timer", label: label, dimensions: dimensions) { id, fields in
             TimerMetric(api: api, id: id, fields: fields)
         }
     }
-    
+
     public func destroyCounter(_ handler: CounterHandler) { destroy(handler) }
     public func destroyFloatingPointCounter(_ handler: FloatingPointCounterHandler) { destroy(handler) }
     public func destroyRecorder(_ handler: RecorderHandler) { destroy(handler) }
@@ -161,7 +161,7 @@ extension InfluxDBMetricsFactory: MetricsFactory {
 }
 
 private extension InfluxDBMetricsFactory {
-    
+
     @inline(__always)
     func destroy(_ handler: Any) {
         guard let metric = handler as? InfluxMetric else {
@@ -171,13 +171,13 @@ private extension InfluxDBMetricsFactory {
             store.removeValue(forKey: metric.id)
         }
     }
-    
+
     func makeFloatingPointCounter(type: String, label: String, dimensions: [(String, String)]) -> FloatingCounter {
         makeHandler(type: type, label: label, dimensions: dimensions) { id, fields in
             FloatingCounter(api: api, id: id, fields: fields)
         }
     }
-    
+
     @inline(__always)
     func makeHandler<H: InfluxMetric>(type: String, label: String, dimensions: [(String, String)], create: (HandlerID, [(String, String)]) -> H) -> H {
         box.withLockedValue { store -> H in

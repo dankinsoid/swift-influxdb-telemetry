@@ -279,20 +279,19 @@ from(bucket: "\(options.bucket)")
             timers[interval] = (task, points)
         } else {
             let task = Task { [weak self] in
+                let offset = (startTime.timeIntervalSince1970 / interval).rounded(.down) * interval
                 let intervalInNanoSeconds = UInt64(interval * 1_000_000_000)
                 var i: UInt64 = 0
                 while !Task.isCancelled {
-                    let date = Date(timeIntervalSince1970: startTime.timeIntervalSince1970 + Double(i) * interval)
+                    let j = i
                     Task { [weak self] in
-                        if let points = await self?.timerPoints(interval: interval) {
-                            for point in points {
-                                try Task.checkCancellation()
-                                await self?.add(point: point(date))
-                            }
-                        }
+                        try await self?.writeTimerPoints(
+                            date: Date(timeIntervalSince1970: offset + Double(j) * interval),
+                            interval: interval
+                        )
                     }
                     try await Task.sleep(nanoseconds: intervalInNanoSeconds)
-                    i += 1
+                    i &+= 1
                 }
             }
             timers[interval] = (task, [id: point])
@@ -312,8 +311,12 @@ from(bucket: "\(options.bucket)")
         }
     }
 
-    private func timerPoints(interval: TimeInterval) -> [(Date) -> InfluxDBClient.Point] {
-        timers[interval]?.1.map(\.value) ?? []
+    private func writeTimerPoints(date: Date, interval: TimeInterval) async throws {
+        guard let points = timers[interval]?.1.values else { return }
+        for point in points {
+            try Task.checkCancellation()
+            await add(point: point(date))
+        }
     }
 
     private func writeIfNeeded() async {

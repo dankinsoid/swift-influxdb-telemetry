@@ -17,13 +17,12 @@ The `InfluxDBMetricsFactory` is designed for metric collection, while the `Influ
 ```swift
 import InfluxDBMetrics
 
-let client = InfluxDBClient(url: "your-influxdb-url", token: "your-auth-token")
-
 MetricsSystem.bootstrap(
     InfluxDBMetricsFactory(
-        bucket: "your-bucket-name",
+        url: "http://localhost:8086",
+        token: "your-token",
         org: "your-org-name",
-        client: client,
+        bucket: "your-bucket-name",
         precision: .ms, // Optional
         batchSize: 5000, // Optional
         throttleInterval: 5, // Optional
@@ -37,30 +36,49 @@ MetricsSystem.bootstrap(
 ```swift
 import InfluxDBLogs
 
-let client = InfluxDBClient(url: "your-influxdb-url", token: "your-auth-token")
-        
 LoggingSystem.bootstrap { name in
     InfluxDBLogHandler(
         name: name,
-        bucket: "your-bucket-name",
+        url: "http://localhost:8086",
+        token: "your-token",
         org: "your-org-name",
-        client: client,
+        bucket: "your-bucket-name",
         precision: .ms, // Optional
         batchSize: 5000, // Optional
         throttleInterval: 5, // Optional
-        metadataLabelsAsTags: InfluxDBLogHandler.defaultMetadataLabelsAsTags.union([.InfluxDBLogHandlerLabels.file]), // Optional
+        metadataLabelsAsTags: .loggingDefault.union([.InfluxDBLogLabels.file]), // Optional
         logLevel: .info, // Optional
-        metadata: [:] // Optional
     )
 }
 ```
 
-### Writing Metrics and Logs
+### Setting Up Analytics
+
+```swift
+import InfluxDBAnalytics
+
+AnalyticsSystem.bootstrap(
+    InfluxDBAnalyticsHandler(
+        url: "http://localhost:8086",
+        token: "your-token",
+        org: "your-org-name",
+        bucket: "your-bucket-name",
+        precision: .ms, // Optional
+        batchSize: 5000, // Optional
+        throttleInterval: 5, // Optional
+        parametersLabelsAsTags: .analyticsDefault.union([.InfluxDBAnalyticsLabels.file]), // Optional
+    )
+)
+```
+
+### Writing Metrics, Logs and Analytics
 
 ```swift
 // Metrics
-let counter = Counter(label: "page_views", dimensions: ["type": "homepage"])
-counter.increment()
+Counter(label: "page_views", dimensions: ["type": "homepage"]).increment()
+
+// Analytics
+Analytics().send("page_view", parameters: ["type": "homepage"])
 
 // Logs
 Logger(label: "app").error("Something went wrong!")
@@ -77,14 +95,15 @@ import PackageDescription
 let package = Package(
   name: "SomeProject",
   dependencies: [
-    .package(url: "https://github.com/dankinsoid/swift-influxdb-logs-metrics.git", from: "0.0.1")
+    .package(url: "https://github.com/dankinsoid/swift-influxdb-logs-metrics.git", from: "1.2.1")
   ],
   targets: [
     .target(
         name: "SomeProject",
         dependencies: [
-            .product(name: "SwiftInfluxDBLogs", package: "swift-influxdb-logs-metrics"),
-            .product(name: "SwiftInfluxDBMetrics", package: "swift-influxdb-logs-metrics")
+            .product(name: "InfluxDBLogs", package: "swift-influxdb-logs-metrics"),
+            .product(name: "InfluxDBAnalytics", package: "swift-influxdb-logs-metrics"),
+            .product(name: "InfluxDBMetrics", package: "swift-influxdb-logs-metrics")
        ]
     )
   ]
