@@ -121,7 +121,7 @@ import PackageDescription
 let package = Package(
   name: "SomeProject",
   dependencies: [
-    .package(url: "https://github.com/dankinsoid/swift-influxdb-telemetry.git", from: "1.3.3")
+    .package(url: "https://github.com/dankinsoid/swift-influxdb-telemetry.git", from: "1.3.4")
   ],
   targets: [
     .target(
@@ -129,7 +129,8 @@ let package = Package(
         dependencies: [
             .product(name: "InfluxDBLogs", package: "swift-influxdb-telemetry"),
             .product(name: "InfluxDBAnalytics", package: "swift-influxdb-telemetry"),
-            .product(name: "InfluxDBMetrics", package: "swift-influxdb-telemetry")
+            .product(name: "InfluxDBMetrics", package: "swift-influxdb-telemetry"),
+            .product(name: "InfluxDBTracing", package: "swift-influxdb-telemetry")
        ]
     )
   ]
