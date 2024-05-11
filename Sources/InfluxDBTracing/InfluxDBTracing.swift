@@ -1,8 +1,8 @@
 import Foundation
-import InfluxDBSwift
-import Instrumentation
+@_exported import InfluxDBSwift
+@_exported import Instrumentation
 @_exported import SwiftInfluxDBCore
-import Tracing
+@_exported import Tracing
 
 /// InfluxDB Tracer.
 /// `InfluxDBTracer` writes spans to InfluxDB with "traces" measurement name.

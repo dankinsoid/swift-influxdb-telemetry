@@ -1,6 +1,6 @@
-import CoreMetrics
+@_exported import CoreMetrics
 import Foundation
-import InfluxDBSwift
+@_exported import InfluxDBSwift
 import Logging
 @_exported import SwiftInfluxDBCore
 

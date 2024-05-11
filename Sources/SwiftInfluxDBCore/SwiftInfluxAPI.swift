@@ -1,7 +1,7 @@
 import Foundation
 @_exported import InfluxDBSwift
 #if canImport(FoundationNetworking)
-import FoundationNetworking
+@_exported import FoundationNetworking
 #endif
 
 public struct BucketWriterOptions: @unchecked Sendable {

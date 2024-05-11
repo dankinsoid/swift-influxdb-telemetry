@@ -1,6 +1,6 @@
 import Foundation
-import InfluxDBSwift
-import Logging
+@_exported import InfluxDBSwift
+@_exported import Logging
 @_exported import SwiftInfluxDBCore
 
 /// InfluxDB Log Handler.

@@ -1,6 +1,6 @@
 import Foundation
-import InfluxDBSwift
-import SwiftAnalytics
+@_exported import InfluxDBSwift
+@_exported import SwiftAnalytics
 @_exported import SwiftInfluxDBCore
 
 /// InfluxDB Analytics Handler.
