@@ -208,6 +208,12 @@ package struct InfluxDBWriter: Sendable {
             }
         }
     }
+
+    package func flush() {
+        Task {
+            await api.writeIfNeeded(force: true)
+        }
+    }
 }
 
 private final actor SwiftInfluxAPI: Sendable {
@@ -319,9 +325,9 @@ from(bucket: "\(options.bucket)")
         }
     }
 
-    private func writeIfNeeded() async {
+    func writeIfNeeded(force: Bool = false) async {
         guard !points.isEmpty else { return }
-        if points.count >= options.batchSize {
+        if points.count >= options.batchSize || force {
             writeTask?.cancel()
             await write()
         } else if writeTask == nil {
@@ -360,7 +366,7 @@ from(bucket: "\(options.bucket)")
     }
 }
 
-private extension InfluxDBClient.Point.FieldValue {
+package extension InfluxDBClient.Point.FieldValue {
 
     var string: String {
         switch self {
