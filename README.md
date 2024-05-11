@@ -120,7 +120,7 @@ import PackageDescription
 let package = Package(
   name: "SomeProject",
   dependencies: [
-    .package(url: "https://github.com/dankinsoid/swift-influxdb-telemetry.git", from: "1.3.26")
+    .package(url: "https://github.com/dankinsoid/swift-influxdb-telemetry.git", from: "1.3.27")
   ],
   targets: [
     .target(
