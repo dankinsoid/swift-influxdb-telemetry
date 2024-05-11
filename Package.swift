@@ -4,7 +4,7 @@
 import PackageDescription
 
 let package = Package(
-	name: "swift-influxdb-logs-metrics",
+	name: "swift-influxdb-telemetry",
 	platforms: [
 		.macOS(.v11),
 		.iOS(.v14),

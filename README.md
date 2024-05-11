@@ -1,12 +1,14 @@
-# swift-influxdb-logs-metrics
+# swift-influxdb-telemetry
 
-This library provides Swift-based tools for integrating InfluxDB with your application for metrics and logging purposes.
+This library provides Swift-based tools for integrating InfluxDB with your application for metrics, logging, analytics and tracing purposes.
 The `InfluxDBMetricsFactory` is designed for metric collection, while the `InfluxDBLogHandler` is tailored for logging, both conforming to Swift's metrics and logging standards.
 
 ## Features
 
 - **Metrics Collection**: Efficiently collects and batches metrics data to be written to InfluxDB.
 - **Logging**: Configurable logging that writes directly to InfluxDB, using metadata tags for enhanced query performance.
+- **Analytics**: Sends analytics data to InfluxDB for analysis and visualization.
+- **Tracing**: Supports distributed tracing for monitoring and troubleshooting.
 - **Batching and Throttling**: Supports batching and throttling to optimize data writing to InfluxDB.
 - **Customizable Tagging**: Allows for flexible tagging of metrics and log data to support diverse querying needs.
 
@@ -71,7 +73,25 @@ AnalyticsSystem.bootstrap(
 )
 ```
 
-### Writing Metrics, Logs and Analytics
+### Setting Up Tracing
+
+```swift
+import InfluxDBTracing
+
+InstrumentationSystem.bootstrap(
+    InfluxDBTracer(
+        url: "http://localhost:8086",
+        token: "your-token",
+        org: "your-org-name",
+        bucket: "your-bucket-name",
+        precision: .ms, // Optional
+        batchSize: 5000, // Optional
+        throttleInterval: 5, // Optional
+    )
+)
+```
+
+### Writing Metrics, Logs, Analytics and Traces
 
 ```swift
 // Metrics
@@ -82,28 +102,34 @@ Analytics().send("page_view", parameters: ["type": "homepage"])
 
 // Logs
 Logger(label: "app").error("Something went wrong!")
+
+// Traces
+withSpan("operation") { span in
+    // Perform operation
+}
 ```
+
 ## Installation
 
 1. [Swift Package Manager](https://github.com/apple/swift-package-manager)
 
 Create a `Package.swift` file.
 ```swift
-// swift-tools-version:5.7
+// swift-tools-version:5.9
 import PackageDescription
 
 let package = Package(
   name: "SomeProject",
   dependencies: [
-    .package(url: "https://github.com/dankinsoid/swift-influxdb-logs-metrics.git", from: "1.3.1")
+    .package(url: "https://github.com/dankinsoid/swift-influxdb-telemetry.git", from: "1.3.22")
   ],
   targets: [
     .target(
         name: "SomeProject",
         dependencies: [
-            .product(name: "InfluxDBLogs", package: "swift-influxdb-logs-metrics"),
-            .product(name: "InfluxDBAnalytics", package: "swift-influxdb-logs-metrics"),
-            .product(name: "InfluxDBMetrics", package: "swift-influxdb-logs-metrics")
+            .product(name: "InfluxDBLogs", package: "swift-influxdb-telemetry"),
+            .product(name: "InfluxDBAnalytics", package: "swift-influxdb-telemetry"),
+            .product(name: "InfluxDBMetrics", package: "swift-influxdb-telemetry")
        ]
     )
   ]
@@ -119,4 +145,4 @@ dankinsoid, voidilov@gmail.com
 
 ## License
 
-swift-influxdb-logs-metrics is available under the MIT license. See the LICENSE file for more info.
+swift-influxdb-telemetry is available under the MIT license. See the LICENSE file for more info.
