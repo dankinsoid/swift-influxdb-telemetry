@@ -53,7 +53,8 @@ public struct InfluxDBLogHandler: LogHandler {
 		self.name = name
 		api = InfluxDBWriter(
 			options: options,
-			labelsAsTags: metadataLabelsAsTags
+			labelsAsTags: metadataLabelsAsTags,
+            telemetryType: "logging"
 		)
 	}
 

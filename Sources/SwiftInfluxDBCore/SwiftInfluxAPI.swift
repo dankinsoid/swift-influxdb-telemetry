@@ -147,14 +147,17 @@ package struct InfluxDBWriter: Sendable {
 
 	package let labelsAsTags: LabelsSet
 	package let intervalType: IntervalType
+    private let telemetryType: String
 	private let api: SwiftInfluxAPI
 
 	package init(
 		options: BucketWriterOptions,
 		intervalType: IntervalType = .irregular,
-		labelsAsTags: LabelsSet
+		labelsAsTags: LabelsSet,
+        telemetryType: String
 	) {
 		self.labelsAsTags = labelsAsTags
+        self.telemetryType = telemetryType
 		self.intervalType = intervalType
 		api = .make(options: options)
 	}
@@ -176,6 +179,7 @@ package struct InfluxDBWriter: Sendable {
 		date: Date = Date()
 	) {
 		let point = InfluxDBClient.Point(measurement)
+        point.addTag(key: "telemetry_type", value: telemetryType)
 		for (key, value) in unspecified {
 			if labelsAsTags.contains(key) {
 				point.addTag(key: key, value: value.string)

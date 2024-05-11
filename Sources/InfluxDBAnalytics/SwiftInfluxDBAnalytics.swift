@@ -42,7 +42,8 @@ public struct InfluxDBAnalyticsHandler: AnalyticsHandler {
 	) {
 		api = InfluxDBWriter(
 			options: options,
-			labelsAsTags: parametersLabelsAsTags
+			labelsAsTags: parametersLabelsAsTags,
+            telemetryType: "analytics"
 		)
 		self.parameters = parameters
 	}

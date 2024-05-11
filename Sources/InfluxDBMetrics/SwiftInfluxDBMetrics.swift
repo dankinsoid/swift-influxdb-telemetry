@@ -48,7 +48,8 @@ public struct InfluxDBMetricsFactory: Sendable {
 		api = InfluxDBWriter(
 			options: options,
 			intervalType: intervalType,
-			labelsAsTags: dimensionsLabelsAsTags
+            labelsAsTags: dimensionsLabelsAsTags,
+            telemetryType: "metrics"
 		)
 		self.dimensions = dimensions
 	}

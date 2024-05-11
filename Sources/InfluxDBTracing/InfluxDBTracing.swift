@@ -41,7 +41,8 @@ public struct InfluxDBTracer: Tracer {
 	) {
 		api = InfluxDBWriter(
 			options: options,
-			labelsAsTags: attributesLabelsAsTags
+			labelsAsTags: attributesLabelsAsTags,
+            telemetryType: "tracing"
 		)
 		self.measurement = measurement
 	}
