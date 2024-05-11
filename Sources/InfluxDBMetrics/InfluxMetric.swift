@@ -1,5 +1,5 @@
 import Foundation
 
 protocol InfluxMetric: Sendable {
-    var id: HandlerID { get }
+	var id: HandlerID { get }
 }

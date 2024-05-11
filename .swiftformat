@@ -7,6 +7,7 @@
 --disable sortDeclarations
 --disable blankLinesAtStartOfScope
 --disable opaqueGenericParameters
+--disable preferForLoop
 --redundanttype inferred
 --header ""
 --enable organizeDeclarations
