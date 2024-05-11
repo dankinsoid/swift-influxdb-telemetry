@@ -95,7 +95,7 @@ import PackageDescription
 let package = Package(
   name: "SomeProject",
   dependencies: [
-    .package(url: "https://github.com/dankinsoid/swift-influxdb-logs-metrics.git", from: "1.3.0")
+    .package(url: "https://github.com/dankinsoid/swift-influxdb-logs-metrics.git", from: "1.3.1")
   ],
   targets: [
     .target(

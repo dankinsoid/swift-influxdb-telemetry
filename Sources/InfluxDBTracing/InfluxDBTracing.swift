@@ -4,9 +4,104 @@ import Instrumentation
 @_exported import SwiftInfluxDBCore
 import Tracing
 
+/// InfluxDB Tracer.
+/// `InfluxDBTracer` writes spans to InfluxDB with "traces" measurement name.
+/// In InfluxDB, tags are indexed dimensions. By default, all dimensions are indexed as tags.
+/// Use the `attributesLabelsAsTags` parameter to customize which attrubutes are treated as tags.
+///
+/// Example of bootstrapping the Instrumentation System:
+/// ```swift
+/// InstrumentationSystem.bootstrap(
+///     InfluxDBTracer(
+///         url: "http://localhost:8086",
+///         token: "your-token",
+///         org: "your-org-name",
+///         bucket: "your-bucket-name",
+///         client: client,
+///         precision: .ms, // Optional
+///         batchSize: 5000, // Optional
+///         throttleInterval: 10, // Optional
+///         attributesLabelsAsTags: .none // Optional
+///     )
+/// )
+/// ```
 public struct InfluxDBTracer: Tracer {
 
 	let api: InfluxDBWriter
+	let measurement: String
+
+	/// Create a new `InfluxDBTracer`.
+	/// - Parameters:
+	///   - options: The InfluxDB writer options.
+	///   - attributesLabelsAsTags: The set of labels to use as tags. Defaults to empty.
+	public init(
+		options: BucketWriterOptions,
+		measurement: String = "traces",
+		attributesLabelsAsTags: LabelsSet = .empty
+	) {
+		api = InfluxDBWriter(
+			options: options,
+			labelsAsTags: attributesLabelsAsTags
+		)
+		self.measurement = measurement
+	}
+
+	/// Create a new `InfluxDBTracer`.
+	/// - Parameters:
+	///   - url: InfluxDB host and port.
+	///   - token: Authentication token.
+	///   - org: The InfluxDB organization.
+	///   - bucket: The InfluxDB bucket.
+	///   - precision: Precision for the unix timestamps within the body line-protocol.
+	///   - batchSize: The maximum number of points to batch before writing to InfluxDB. Defaults to 5000.
+	///   - throttleInterval: The maximum number of seconds to wait before writing a batch of points. Defaults to 5.
+	///   - timeoutIntervalForRequest: Timeout interval to use when waiting for additional data.
+	///   - timeoutIntervalForResource: Maximum amount of time that a resource request should be allowed to take.
+	///   - enableGzip: Enable Gzip compression for HTTP requests.
+	///   - connectionProxyDictionary: Enable Gzip compression for HTTP requests.
+	///   - urlSessionDelegate: A delegate to handle HTTP session-level events.
+	///   - debugging: optional Enable debugging for HTTP request/response. Default `false`.
+	///   - protocolClasses: optional array of extra protocol subclasses that handle requests.
+	///   - attributesLabelsAsTags: The set of labels to use as tags. Defaults to empty.
+	public init(
+		url: String,
+		token: String,
+		org: String,
+		bucket: String,
+		measurement: String = "traces",
+		precision: InfluxDBClient.TimestampPrecision = InfluxDBClient.defaultTimestampPrecision,
+		batchSize: Int = 5000,
+		throttleInterval: UInt16 = 5,
+		timeoutIntervalForRequest: TimeInterval = 60,
+		timeoutIntervalForResource: TimeInterval = 60 * 5,
+		enableGzip: Bool = false,
+		connectionProxyDictionary: [AnyHashable: Any]? = nil,
+		urlSessionDelegate: URLSessionDelegate? = nil,
+		debugging: Bool? = nil,
+		protocolClasses: [AnyClass]? = nil,
+		attributesLabelsAsTags: LabelsSet = .empty
+	) {
+		self.init(
+			options: BucketWriterOptions(
+				url: url,
+				token: token,
+				org: org,
+				bucket: bucket,
+				precision: precision,
+				batchSize: batchSize,
+				throttleInterval: throttleInterval,
+				timeoutIntervalForRequest: timeoutIntervalForRequest,
+				timeoutIntervalForResource: timeoutIntervalForResource,
+				enableGzip: enableGzip,
+				connectionProxyDictionary: connectionProxyDictionary,
+				urlSessionDelegate: urlSessionDelegate,
+				debugging: debugging,
+				protocolClasses: protocolClasses
+			),
+			measurement: measurement,
+			attributesLabelsAsTags: attributesLabelsAsTags
+		)
+	}
 
 	public func extract<Carrier, Extract: Extractor>(
 		_ carrier: Carrier,
@@ -72,7 +167,7 @@ public struct InfluxDBTracer: Tracer {
 			startTimeNanosecondsSinceEpoch: startNano
 		) { [api] span, endTimeNanosecondsSinceEpoch in
 			var parameters: [(String, InfluxDBClient.Point.FieldValue)] = []
-            span.attributes.forEach { (name, attribute) in
+			span.attributes.forEach { name, attribute in
 				parameters.append((name, attribute.fieldValue))
 			}
 			let error = span.events.last(where: { $0.name == "exception" })?
@@ -80,7 +175,7 @@ public struct InfluxDBTracer: Tracer {
 				.get("exception.message")?
 				.fieldValue
 			api.write(
-				measurement: "traces",
+				measurement: measurement,
 				tags: [
 					"trace_id": traceID,
 					"span_id": spanID,
@@ -275,7 +370,7 @@ private extension SpanEvent {
 		var result = "\(name) - \(nanosecondsSinceEpoch)"
 		if !attributes.isEmpty {
 			var attributesString = "["
-            attributes.forEach { (name, attribute) in 
+			attributes.forEach { name, attribute in
 				attributesString += "\(name): \(attribute.fieldValue.string), "
 			}
 			attributesString.removeLast(2)
