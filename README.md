@@ -1,7 +1,6 @@
 # swift-influxdb-telemetry
 
 This library provides Swift-based tools for integrating InfluxDB with your application for metrics, logging, analytics and tracing purposes.
-The `InfluxDBMetricsFactory` is designed for metric collection, while the `InfluxDBLogHandler` is tailored for logging, both conforming to Swift's metrics and logging standards.
 
 ## Features
 
@@ -10,7 +9,7 @@ The `InfluxDBMetricsFactory` is designed for metric collection, while the `Influ
 - **Analytics**: Sends analytics data to InfluxDB for analysis and visualization.
 - **Tracing**: Supports distributed tracing for monitoring and troubleshooting.
 - **Batching and Throttling**: Supports batching and throttling to optimize data writing to InfluxDB.
-- **Customizable Tagging**: Allows for flexible tagging of metrics and log data to support diverse querying needs.
+- **Customizable Tagging**: Allows for flexible tagging to support diverse querying needs.
 
 ## Usage
 
@@ -121,7 +120,7 @@ import PackageDescription
 let package = Package(
   name: "SomeProject",
   dependencies: [
-    .package(url: "https://github.com/dankinsoid/swift-influxdb-telemetry.git", from: "1.3.4")
+    .package(url: "https://github.com/dankinsoid/swift-influxdb-telemetry.git", from: "1.3.5")
   ],
   targets: [
     .target(
