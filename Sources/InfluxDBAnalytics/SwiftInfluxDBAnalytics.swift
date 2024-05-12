@@ -29,14 +29,17 @@ public struct InfluxDBAnalyticsHandler: AnalyticsHandler {
 
 	private let api: InfluxDBWriter
 	private let uuid = UUID()
+    private let measurementNamePolicy: MeasurementNamePolicy
 
 	/// Create a new `InfluxDBAnalyticsHandler`.
 	/// - Parameters:
 	///   - options: The InfluxDB writer options.
-	///   - parametersLabelsAsTags: The set of metadata labels to use as tags. Defaults to ["source"].
+    ///   - measurementNamePolicy: Defines how to name the measurement. Defaults to `.byName`.
+	///   - parametersLabelsAsTags: The set of metadata labels to use as tags. Defaults to ["source", "event_name"].
 	///   - parameters: Global parameters for all events. Defaults to `[:]`.
 	public init(
 		options: BucketWriterOptions,
+        measurementNamePolicy: MeasurementNamePolicy = .byName,
 		parametersLabelsAsTags: LabelsSet = .analyticsDefault,
 		parameters: Analytics.Parameters = [:]
 	) {
@@ -45,6 +48,7 @@ public struct InfluxDBAnalyticsHandler: AnalyticsHandler {
 			labelsAsTags: parametersLabelsAsTags,
             telemetryType: "analytics"
 		)
+        self.measurementNamePolicy = measurementNamePolicy
 		self.parameters = parameters
 	}
 
@@ -64,7 +68,8 @@ public struct InfluxDBAnalyticsHandler: AnalyticsHandler {
 	///   - urlSessionDelegate: A delegate to handle HTTP session-level events.
 	///   - debugging: optional Enable debugging for HTTP request/response. Default `false`.
 	///   - protocolClasses: optional array of extra protocol subclasses that handle requests.
-	///   - parametersLabelsAsTags: The set of metadata labels to use as tags. Defaults to ["source"].
+    ///   - measurementNamePolicy: Defines how to name the measurement. Defaults to `.byName`.
+    ///   - parametersLabelsAsTags: The set of metadata labels to use as tags. Defaults to ["source", "event_name"].   
 	///   - parameters: Global parameters for all events. Defaults to `[:]`.
 	public init(
 		url: String,
@@ -81,6 +86,7 @@ public struct InfluxDBAnalyticsHandler: AnalyticsHandler {
 		urlSessionDelegate: URLSessionDelegate? = nil,
 		debugging: Bool? = nil,
 		protocolClasses: [AnyClass]? = nil,
+        measurementNamePolicy: MeasurementNamePolicy = .byName,
 		parametersLabelsAsTags: LabelsSet = .analyticsDefault,
 		parameters: Analytics.Parameters = [:]
 	) {
@@ -101,29 +107,67 @@ public struct InfluxDBAnalyticsHandler: AnalyticsHandler {
 				debugging: debugging,
 				protocolClasses: protocolClasses
 			),
+            measurementNamePolicy: measurementNamePolicy,
 			parametersLabelsAsTags: parametersLabelsAsTags,
 			parameters: parameters
 		)
 	}
 
 	public func send(event: Analytics.Event, file: String, function: String, line: UInt, source: String) {
-		let data: [(String, InfluxDBClient.Point.FieldValue)] = [
+        let measurement = measurementNamePolicy.measurement(event.name)
+		var data: [(String, InfluxDBClient.Point.FieldValue)] = [
 			(.InfluxDBAnalyticsLabels.line, .uint(line)),
 			(.InfluxDBAnalyticsLabels.function, .string(function)),
 			(.InfluxDBAnalyticsLabels.file, .string(file)),
-			(.InfluxDBAnalyticsLabels.source, .string(source)),
-		] + parameters
+			(.InfluxDBAnalyticsLabels.source, .string(source))
+		] 
+        if measurement != event.name {
+            data.append((.InfluxDBAnalyticsLabels.event_name, .string(event.name)))
+        }
+        data += parameters
 			.merging(event.parameters) { _, new in new }
 			.map { ($0.key, $0.value.fieldValue) }
 
 		api.write(
-			measurement: event.name,
+            measurement: measurement,
 			tags: [:],
 			fields: [:],
 			unspecified: data,
 			measurementID: uuid
 		)
 	}
+
+    public struct MeasurementNamePolicy: _SwiftAnalyticsSendableAnalyticsHandler {
+
+        /// Use the event name as the measurement name.
+        public static var byName: MeasurementNamePolicy {
+            MeasurementNamePolicy { $0 }
+        }
+
+        /// Use a global measurement name.
+        public static func global(_ value: String) -> MeasurementNamePolicy {
+            MeasurementNamePolicy { _ in value }
+        }
+
+        /// Use `events` as the measurement name.
+        public static var global: MeasurementNamePolicy {
+            .global("events")
+        }
+
+#if compiler(>=5.6)
+        public let measurement: @Sendable (_ name: String) -> String
+
+        public init(_ measurement: @escaping @Sendable (_ name: String) -> String) {
+            self.measurement = measurement
+        }
+#else
+        public let measurement: (_ name: String) -> String
+
+        public init(_ measurement: @escaping (_ name: String) -> String) {
+            self.measurement = measurement
+        }
+#endif
+    }
 }
 
 public extension String {
@@ -134,6 +178,7 @@ public extension String {
 		static let line = "line"
 		static let function = "function"
 		static let file = "file"
+        static let event_name = "event_name"
 	}
 }
 
@@ -141,6 +186,7 @@ public extension LabelsSet {
 
 	static let analyticsDefault: LabelsSet = [
 		.InfluxDBAnalyticsLabels.source,
+        .InfluxDBAnalyticsLabels.event_name,
 	]
 }
 

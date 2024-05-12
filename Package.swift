@@ -58,6 +58,7 @@ let package = Package(
 			name: "SwiftInfluxDBCore",
 			dependencies: [
 				.product(name: "InfluxDBSwift", package: "influxdb-client-swift"),
+                .product(name: "Logging", package: "swift-log"),
 			]
 		),
 	]

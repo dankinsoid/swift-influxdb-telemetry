@@ -28,15 +28,16 @@ import Foundation
 public struct InfluxDBTracer: Tracer {
 
 	let api: InfluxDBWriter
-	let measurement: String
+	let measurementNamePolicy: MeasurementNamePolicy
 
 	/// Create a new `InfluxDBTracer`.
 	/// - Parameters:
 	///   - options: The InfluxDB writer options.
+    ///   - measurementNamePolicy: Defines how to name the measurement. Defaults to `.global`.
 	///   - attributesLabelsAsTags: The set of labels to use as tags. Defaults to empty.
 	public init(
 		options: BucketWriterOptions,
-		measurement: String = "traces",
+        measurementNamePolicy: MeasurementNamePolicy = .global,
 		attributesLabelsAsTags: LabelsSet = .empty
 	) {
 		api = InfluxDBWriter(
@@ -44,7 +45,7 @@ public struct InfluxDBTracer: Tracer {
 			labelsAsTags: attributesLabelsAsTags,
             telemetryType: "tracing"
 		)
-		self.measurement = measurement
+		self.measurementNamePolicy = measurementNamePolicy
 	}
 
 	/// Create a new `InfluxDBTracer`.
@@ -63,13 +64,14 @@ public struct InfluxDBTracer: Tracer {
 	///   - urlSessionDelegate: A delegate to handle HTTP session-level events.
 	///   - debugging: optional Enable debugging for HTTP request/response. Default `false`.
 	///   - protocolClasses: optional array of extra protocol subclasses that handle requests.
+    ///   - measurementNamePolicy: Defines how to name the measurement. Defaults to `.global`.
 	///   - attributesLabelsAsTags: The set of labels to use as tags. Defaults to empty.
 	public init(
 		url: String,
 		token: String,
 		org: String,
 		bucket: String,
-		measurement: String = "traces",
+        measurementNamePolicy: MeasurementNamePolicy = .global,
 		precision: InfluxDBClient.TimestampPrecision = InfluxDBClient.defaultTimestampPrecision,
 		batchSize: Int = 5000,
 		throttleInterval: UInt16 = 5,
@@ -99,7 +101,7 @@ public struct InfluxDBTracer: Tracer {
 				debugging: debugging,
 				protocolClasses: protocolClasses
 			),
-			measurement: measurement,
+			measurementNamePolicy: measurementNamePolicy,
 			attributesLabelsAsTags: attributesLabelsAsTags
 		)
 	}
@@ -168,6 +170,7 @@ public struct InfluxDBTracer: Tracer {
 			startTimeNanosecondsSinceEpoch: startNano
 		) { [api] span, endTimeNanosecondsSinceEpoch in
 			var parameters: [(String, InfluxDBClient.Point.FieldValue)] = []
+            let measurement = measurementNamePolicy.measurement(span.operationName)
 			span.attributes.forEach { name, attribute in
 				parameters.append((name, attribute.fieldValue))
 			}
@@ -176,12 +179,12 @@ public struct InfluxDBTracer: Tracer {
 				.get("exception.message")?
 				.fieldValue
 			api.write(
-				measurement: measurement,
+                measurement: measurement,
 				tags: [
 					"trace_id": traceID,
 					"span_id": spanID,
 					"parent_span_id": parentContext.spanContext?.spanID,
-					"operation_name": span.operationName,
+                    "operation_name": measurement == span.operationName ? nil : span.operationName,
 					"status": span.status?.code != .ok || error != nil ? "ERROR" : "OK",
 				]
 				.compactMapValues { $0 },
@@ -303,6 +306,32 @@ public struct InfluxDBTracer: Tracer {
 			onEnd(self, endTimeNanosecondsSinceEpoch)
 		}
 	}
+
+    public struct MeasurementNamePolicy: Sendable {
+
+        /// Use the span operation name as the measurement name.
+        public static var byOperationName: MeasurementNamePolicy {
+            MeasurementNamePolicy { operationName in operationName }
+        }
+        
+        /// Use a global measurement name.
+        public static func global(_ value: String) -> MeasurementNamePolicy {
+            MeasurementNamePolicy { _ in value }
+        }
+
+        /// Use `traces` as the measurement name.
+        public static var global: MeasurementNamePolicy {
+            .global("traces")
+        }
+
+        public let measurement: @Sendable (
+            _ operationName: String
+        ) -> String
+
+        public init(_ measurement: @escaping @Sendable (_ operationName: String) -> String) {
+            self.measurement = measurement
+        }
+    }
 }
 
 public extension ServiceContext {
