@@ -164,7 +164,7 @@ public struct InfluxDBLogHandler: LogHandler {
         }
 
         data += self.metadata
-            .merging(metadataProvider?.get() ?? [:]) { _, new in new }
+            .merging(metadataProvider?.get() ?? [:]) { o, _ in o }
 			.merging(metadata ?? [:]) { _, new in new }
 			.map { ($0.key, $0.value.fieldValue) }
 
