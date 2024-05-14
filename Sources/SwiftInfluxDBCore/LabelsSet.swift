@@ -48,7 +48,7 @@ public struct LabelsSet: ExpressibleByArrayLiteral, Sendable {
 	}
 
 	public func contains(_ label: String, in measurement: String) -> Bool {
-		_contains(measurement, label)
+		_contains(label, measurement)
 	}
 
 	public func union(_ other: __owned LabelsSet) -> LabelsSet {
