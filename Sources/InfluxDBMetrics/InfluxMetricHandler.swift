@@ -38,13 +38,13 @@ final class InfluxMetricHandler<Value: AtomicValue & ExpressibleByIntegerLiteral
 		loadValues: Bool = false,
 		_ operation: @Sendable @escaping (ManagedAtomic<Value>) -> Void
 	) {
-        let prependDate = Date()
-        let date = Date()
+		let prependDate = Date()
+		let date = Date()
 		let writeOperation: @Sendable (Bool) -> Void = { [weak self] prependValue in
 			guard let self else { return }
-            if prependValue {
-                self.write(date: prependDate)
-            }
+			if prependValue {
+				self.write(date: prependDate)
+			}
 			operation(self.atomic)
 			self.write(date: date)
 		}
@@ -56,7 +56,7 @@ final class InfluxMetricHandler<Value: AtomicValue & ExpressibleByIntegerLiteral
 		}
 	}
 
-    private func write(date: Date) {
+	private func write(date: Date) {
 		var fields = Dictionary(fields) { _, n in n }.mapValues(InfluxDBClient.Point.FieldValue.string)
 		fields["value"] = value(atomic.load(ordering: .relaxed))
 		api.write(
@@ -65,7 +65,7 @@ final class InfluxMetricHandler<Value: AtomicValue & ExpressibleByIntegerLiteral
 			fields: fields,
 			unspecified: [],
 			measurementID: uuid,
-            date: date
+			date: date
 		)
 	}
 
@@ -84,20 +84,20 @@ final class InfluxMetricHandler<Value: AtomicValue & ExpressibleByIntegerLiteral
 	}
 
 	private func loadValue() async {
-        var needPrepend = false
+		var needPrepend = false
 		do {
 			if
 				let result = try await api.load(measurement: id.label, tags: id.tags, fields: ["value"]),
 				let value = result.values["_value"].flatMap(toValue)
 			{
 				atomic.store(value, ordering: .sequentiallyConsistent)
-            } else {
-                needPrepend = true
-            }
+			} else {
+				needPrepend = true
+			}
 		} catch {}
 		query.withLockedValue {
-            for i in $0.indices {
-                $0[i](needPrepend && i == 0)
+			for i in $0.indices {
+				$0[i](needPrepend && i == 0)
 			}
 			$0 = []
 		}

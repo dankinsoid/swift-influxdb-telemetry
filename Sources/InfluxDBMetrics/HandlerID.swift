@@ -13,7 +13,7 @@ struct HandlerID: Hashable {
 		self.type = type
 		var fields: [(String, String)] = []
 		for (key, value) in dimensions {
-			if labelsAsTags.contains(key) {
+			if labelsAsTags.contains(key, in: label) {
 				tags[key] = value
 			} else {
 				fields.append((key, value))

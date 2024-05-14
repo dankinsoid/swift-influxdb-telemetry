@@ -31,38 +31,38 @@ public struct InfluxDBLogHandler: LogHandler {
 	public var metadata: Logger.Metadata
 	public var logLevel: Logger.Level
 	public var label: String
-    public var metadataProvider: Logger.MetadataProvider?
+	public var metadataProvider: Logger.MetadataProvider?
 	private let api: InfluxDBWriter
 	private let uuid = UUID()
-    private let measurementNamePolicy: MeasurementNamePolicy
+	private let measurementNamePolicy: MeasurementNamePolicy
 
 	/// Create a new `InfluxDBLogHandler`.
 	/// - Parameters:
 	///   - label: The logger label.
 	///   - options: The InfluxDB writer options.
-    ///   - measurementNamePolicy: Defines how to name the measurement. Defaults to `.byLabel`.
-    ///   - metadataLabelsAsTags: The set of metadata labels to use as tags. Defaults to ["source", "log_level", "logger_label"].
+	///   - measurementNamePolicy: Defines how to name the measurement. Defaults to `.byLabel`.
+	///   - metadataLabelsAsTags: The set of metadata labels to use as tags. Defaults to ["source", "log_level", "logger_label"].
 	///   - logLevel: The log level to use. Defaults to `.info`.
 	///   - metadata: The metadata to use. Defaults to `[:]`.
-    ///   - metadataProvider: A metadata provider to use.
+	///   - metadataProvider: A metadata provider to use.
 	public init(
 		label: String,
 		options: BucketWriterOptions,
-        measurementNamePolicy: MeasurementNamePolicy = .byLabel,
+		measurementNamePolicy: MeasurementNamePolicy = .byLabel,
 		metadataLabelsAsTags: LabelsSet = .loggingDefault,
 		logLevel: Logger.Level = .info,
 		metadata: Logger.Metadata = [:],
-        metadataProvider: Logger.MetadataProvider? = nil
+		metadataProvider: Logger.MetadataProvider? = nil
 	) {
 		self.metadata = metadata
 		self.logLevel = logLevel
 		self.label = label
-        self.measurementNamePolicy = measurementNamePolicy
-        self.metadataProvider = metadataProvider
+		self.measurementNamePolicy = measurementNamePolicy
+		self.metadataProvider = metadataProvider
 		api = InfluxDBWriter(
 			options: options,
 			labelsAsTags: metadataLabelsAsTags,
-            telemetryType: "logging"
+			telemetryType: "logging"
 		)
 	}
 
@@ -83,13 +83,13 @@ public struct InfluxDBLogHandler: LogHandler {
 	///   - urlSessionDelegate: A delegate to handle HTTP session-level events.
 	///   - debugging: optional Enable debugging for HTTP request/response. Default `false`.
 	///   - protocolClasses: optional array of extra protocol subclasses that handle requests.
-    ///   - measurementNamePolicy: Defines how to name the measurement. Defaults to `.byLabel`.
+	///   - measurementNamePolicy: Defines how to name the measurement. Defaults to `.byLabel`.
 	///   - metadataLabelsAsTags: The set of metadata labels to use as tags. Defaults to ["source", "log_level", "logger_label"].
 	///   - logLevel: The log level to use. Defaults to `.info`.
 	///   - metadata: The metadata to use. Defaults to `[:]`.
-    ///   - metadataProvider: A metadata provider to use.
+	///   - metadataProvider: A metadata provider to use.
 	public init(
-        label: String,
+		label: String,
 		url: String,
 		token: String,
 		org: String,
@@ -104,11 +104,11 @@ public struct InfluxDBLogHandler: LogHandler {
 		urlSessionDelegate: URLSessionDelegate? = nil,
 		debugging: Bool? = nil,
 		protocolClasses: [AnyClass]? = nil,
-        measurementNamePolicy: MeasurementNamePolicy = .byLabel,
+		measurementNamePolicy: MeasurementNamePolicy = .byLabel,
 		metadataLabelsAsTags: LabelsSet = .loggingDefault,
 		logLevel: Logger.Level = .info,
 		metadata: Logger.Metadata = [:],
-        metadataProvider: Logger.MetadataProvider? = nil
+		metadataProvider: Logger.MetadataProvider? = nil
 	) {
 		self.init(
 			label: label,
@@ -128,11 +128,11 @@ public struct InfluxDBLogHandler: LogHandler {
 				debugging: debugging,
 				protocolClasses: protocolClasses
 			),
-            measurementNamePolicy: measurementNamePolicy,
+			measurementNamePolicy: measurementNamePolicy,
 			metadataLabelsAsTags: metadataLabelsAsTags,
 			logLevel: logLevel,
 			metadata: metadata,
-            metadataProvider: metadataProvider
+			metadataProvider: metadataProvider
 		)
 	}
 
@@ -150,82 +150,82 @@ public struct InfluxDBLogHandler: LogHandler {
 		function: String,
 		line: UInt
 	) {
-        guard label != InfluxDBWriter.loggerLabel else { return }
-        let measurement = measurementNamePolicy.measurement(level, source, label)
+		guard label != InfluxDBWriter.loggerLabel else { return }
+		let measurement = measurementNamePolicy.measurement(level, source, label)
 		var data: [(String, InfluxDBClient.Point.FieldValue)] = [
 			(.InfluxDBLogLabels.line, .uint(line)),
 			(.InfluxDBLogLabels.function, .string(function)),
 			(.InfluxDBLogLabels.file, .string(file)),
 			(.InfluxDBLogLabels.source, .string(source)),
-			(.InfluxDBLogLabels.log_level, .string(level.rawValue.uppercased()))
+			(.InfluxDBLogLabels.log_level, .string(level.rawValue.uppercased())),
 		]
-        if measurement != label {
-            data.append((.InfluxDBLogLabels.logger_label, .string(label)))
-        }
+		if measurement != label {
+			data.append((.InfluxDBLogLabels.logger_label, .string(label)))
+		}
 
-        data += self.metadata
-            .merging(metadataProvider?.get() ?? [:]) { o, _ in o }
+		data += self.metadata
+			.merging(metadataProvider?.get() ?? [:]) { o, _ in o }
 			.merging(metadata ?? [:]) { _, new in new }
 			.map { ($0.key, $0.value.fieldValue) }
 
 		api.write(
-            measurement: measurement,
-            tags: [:],
+			measurement: measurement,
+			tags: [:],
 			fields: ["message": .string(message.description)],
 			unspecified: data,
 			measurementID: uuid
 		)
 	}
 
-    public struct MeasurementNamePolicy: _SwiftLogSendableLogHandler {
+	public struct MeasurementNamePolicy: _SwiftLogSendableLogHandler {
 
-        /// Use the log level as the measurement name.
-        public static var byLevel: MeasurementNamePolicy {
-            MeasurementNamePolicy { level, _, _ in level.rawValue }
-        }
+		/// Use the log level as the measurement name.
+		public static var byLevel: MeasurementNamePolicy {
+			MeasurementNamePolicy { level, _, _ in level.rawValue }
+		}
 
-        /// Use the log source as the measurement name.
-        public static var bySource: MeasurementNamePolicy {
-            MeasurementNamePolicy { _, source, _ in source }
-        }
+		/// Use the log source as the measurement name.
+		public static var bySource: MeasurementNamePolicy {
+			MeasurementNamePolicy { _, source, _ in source }
+		}
 
-        /// Use the logger label as the measurement name.
-        public static var byLabel: MeasurementNamePolicy {
-            MeasurementNamePolicy { _, _, label in label }
-        }
+		/// Use the logger label as the measurement name.
+		public static var byLabel: MeasurementNamePolicy {
+			MeasurementNamePolicy { _, _, label in label }
+		}
 
-        /// Use a global measurement name.
-        public static func global(_ value: String) -> MeasurementNamePolicy {
-            MeasurementNamePolicy { _, _, _ in value }
-        }
+		/// Use a global measurement name.
+		public static func global(_ value: String) -> MeasurementNamePolicy {
+			MeasurementNamePolicy { _, _, _ in value }
+		}
 
-        /// Use `logs` as the measurement name.
-        public static var global: MeasurementNamePolicy {
-            .global("logs")
-        }
+		/// Use `logs` as the measurement name.
+		public static var global: MeasurementNamePolicy {
+			.global("logs")
+		}
 
-#if compiler(>=5.6)
-        public let measurement: @Sendable (
-            _ level: Logger.Level,
-            _ source: String,
-            _ label: String
-        ) -> String
-        
-        public init(_ measurement: @escaping @Sendable (_ level: Logger.Level, _ source: String, _ label: String) -> String) {
-            self.measurement = measurement
-        }
-#else
-        public let measurement: (
-            _ level: Logger.Level,
-            _ source: String,
-            _ label: String
-        ) -> String
-        
-        public init(_ measurement: @escaping (_ level: Logger.Level, _ source: String, _ label: String) -> String) {
-            self.measurement = measurement
-        }
-#endif
-    }
+		#if compiler(>=5.6)
+		public let measurement: @Sendable (
+			_ level: Logger.Level,
+			_ source: String,
+			_ label: String
+		) -> String
+
+		public init(_ measurement: @escaping @Sendable (_ level: Logger.Level, _ source: String, _ label: String) -> String) {
+			self.measurement = measurement
+		}
+		#else
+		public let measurement: (
+			_ level: Logger.Level,
+			_ source: String,
+			_ label: String
+		) -> String
+
+		public init(_ measurement: @escaping (_ level: Logger.Level, _ source: String, _ label: String) -> String) {
+			self.measurement = measurement
+		}
+		#endif
+	}
 }
 
 public extension String {
@@ -237,7 +237,7 @@ public extension String {
 		static let line = "line"
 		static let function = "function"
 		static let file = "file"
-        static let logger_label = "logger_label"
+		static let logger_label = "logger_label"
 	}
 }
 
@@ -246,7 +246,7 @@ public extension LabelsSet {
 	static let loggingDefault: LabelsSet = [
 		.InfluxDBLogLabels.source,
 		.InfluxDBLogLabels.log_level,
-        .InfluxDBLogLabels.logger_label,
+		.InfluxDBLogLabels.logger_label,
 	]
 }
 

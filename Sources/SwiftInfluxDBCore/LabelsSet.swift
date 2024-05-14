@@ -6,11 +6,11 @@ public struct LabelsSet: ExpressibleByArrayLiteral, Sendable {
 	public static let empty = LabelsSet()
 	public static let all = LabelsSet { _ in true }
 
-	private var _contains: @Sendable (String) -> Bool
+	private var _contains: @Sendable (_ label: String, _ measurement: String) -> Bool
 
 	public var inverted: LabelsSet {
 		LabelsSet { [contains] in
-			!contains($0)
+			!contains($0, $1)
 		}
 	}
 
@@ -18,8 +18,12 @@ public struct LabelsSet: ExpressibleByArrayLiteral, Sendable {
 		self.init { _ in false }
 	}
 
-	public init(_ contains: @escaping @Sendable (String) -> Bool) {
+	public init(_ contains: @escaping @Sendable (_ label: String, _ measurement: String) -> Bool) {
 		_contains = contains
+	}
+
+	public init(_ contains: @escaping @Sendable (String) -> Bool) {
+		_contains = { label, _ in contains(label) }
 	}
 
 	public init(_ labels: some Collection<String>) {
@@ -37,51 +41,51 @@ public struct LabelsSet: ExpressibleByArrayLiteral, Sendable {
 		self.init(elements)
 	}
 
-	public func contains(_ label: String) -> Bool {
-		_contains(label)
+	public func measurement(_ measurement: String) -> LabelsSet {
+		LabelsSet { [self] in
+			$1 == measurement && contains($0, in: $1)
+		}
+	}
+
+	public func contains(_ label: String, in measurement: String) -> Bool {
+		_contains(measurement, label)
 	}
 
 	public func union(_ other: __owned LabelsSet) -> LabelsSet {
 		LabelsSet { [self, other] in
-			contains($0) || other.contains($0)
+			contains($0, in: $1) || other.contains($0, in: $1)
 		}
 	}
 
 	public func intersection(_ other: LabelsSet) -> LabelsSet {
 		LabelsSet { [self, other] in
-			contains($0) && other.contains($0)
+			contains($0, in: $1) && other.contains($0, in: $1)
 		}
 	}
 
 	public func symmetricDifference(_ other: __owned LabelsSet) -> LabelsSet {
 		LabelsSet { [self, other] in
-			contains($0) != other.contains($0)
+			contains($0, in: $1) != other.contains($0, in: $1)
 		}
 	}
 
 	public mutating func insert(_ newMember: __owned String) -> (inserted: Bool, memberAfterInsert: String) {
 		_contains = { [contains = _contains] in
-			contains($0) || $0 == newMember
+			contains($0, $1) || $0 == newMember
 		}
 		return (true, newMember)
 	}
 
 	public mutating func remove(_ member: String) -> String? {
-		guard contains(member) else {
-			return nil
-		}
 		_contains = { [contains = _contains] in
-			contains($0) && $0 != member
+			contains($0, $1) && $0 != member
 		}
 		return member
 	}
 
 	public mutating func update(with newMember: __owned String) -> String? {
-		guard !contains(newMember) else {
-			return nil
-		}
 		_contains = { [contains = _contains] in
-			contains($0) || $0 == newMember
+			contains($0, $1) || $0 == newMember
 		}
 		return newMember
 	}

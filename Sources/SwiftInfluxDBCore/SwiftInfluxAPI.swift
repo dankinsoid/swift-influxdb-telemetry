@@ -12,7 +12,7 @@ public struct BucketWriterOptions: @unchecked Sendable {
 	public var org: String
 	public var batchSize: Int
 	public var throttleInterval: UInt16
-    public var errorPolicy: ErrorPolicy
+	public var errorPolicy: ErrorPolicy
 
 	/// Create a new `BucketWriterOptions`.
 	/// - Parameters:
@@ -21,21 +21,21 @@ public struct BucketWriterOptions: @unchecked Sendable {
 	///   - bucket: The InfluxDB bucket.
 	///   - batchSize: The maximum number of points to batch before writing to InfluxDB. Defaults to 5000.
 	///   - throttleInterval: The maximum number of seconds to wait before writing a batch of points. Defaults to 5.
-    ///   - errorPolicy: The error policy to use. Defaults to `.tryLater`.
+	///   - errorPolicy: The error policy to use. Defaults to `.tryLater`.
 	public init(
 		client: InfluxDBClient,
 		org: String,
 		bucket: String,
 		batchSize: Int = 5000,
 		throttleInterval: UInt16 = 5,
-        errorPolicy: ErrorPolicy = .tryLater
+		errorPolicy: ErrorPolicy = .tryLater
 	) {
 		self.client = client
 		self.bucket = bucket
 		self.org = org
 		self.batchSize = batchSize
 		self.throttleInterval = throttleInterval
-        self.errorPolicy = errorPolicy
+		self.errorPolicy = errorPolicy
 	}
 
 	/// Create a new `BucketWriterOptions`.
@@ -50,7 +50,7 @@ public struct BucketWriterOptions: @unchecked Sendable {
 	///   - throttleInterval: The maximum number of seconds to wait before writing a batch of points. Defaults to 5.
 	///   - timeoutIntervalForRequest: Timeout interval to use when waiting for additional data.
 	///   - timeoutIntervalForResource: Maximum amount of time that a resource request should be allowed to take.
-    ///   - errorPolicy: The error policy to use. Defaults to `.tryLater`.
+	///   - errorPolicy: The error policy to use. Defaults to `.tryLater`.
 	///   - enableGzip: Enable Gzip compression for HTTP requests.
 	///   - connectionProxyDictionary: Enable Gzip compression for HTTP requests.
 	///   - urlSessionDelegate: A delegate to handle HTTP session-level events.
@@ -66,7 +66,7 @@ public struct BucketWriterOptions: @unchecked Sendable {
 		throttleInterval: UInt16 = 5,
 		timeoutIntervalForRequest: TimeInterval = 60,
 		timeoutIntervalForResource: TimeInterval = 60 * 5,
-        errorPolicy: ErrorPolicy = .tryLater,
+		errorPolicy: ErrorPolicy = .tryLater,
 		enableGzip: Bool = false,
 		connectionProxyDictionary: [AnyHashable: Any]? = nil,
 		urlSessionDelegate: URLSessionDelegate? = nil,
@@ -90,7 +90,7 @@ public struct BucketWriterOptions: @unchecked Sendable {
 			),
 			org: org,
 			bucket: bucket,
-            errorPolicy: errorPolicy
+			errorPolicy: errorPolicy
 		)
 	}
 
@@ -109,7 +109,7 @@ public struct BucketWriterOptions: @unchecked Sendable {
 	///   - throttleInterval: The maximum number of seconds to wait before writing a batch of points. Defaults to 5.
 	///   - timeoutIntervalForRequest: Timeout interval to use when waiting for additional data.
 	///   - timeoutIntervalForResource: Maximum amount of time that a resource request should be allowed to take.
-    ///   - errorPolicy: The error policy to use. Defaults to `.tryLater`.
+	///   - errorPolicy: The error policy to use. Defaults to `.tryLater`.
 	///   - enableGzip: Enable Gzip compression for HTTP requests.
 	///   - connectionProxyDictionary: Enable Gzip compression for HTTP requests.
 	///   - urlSessionDelegate: A delegate to handle HTTP session-level events.
@@ -127,7 +127,7 @@ public struct BucketWriterOptions: @unchecked Sendable {
 		throttleInterval: UInt16 = 5,
 		timeoutIntervalForRequest: TimeInterval = 60,
 		timeoutIntervalForResource: TimeInterval = 60 * 5,
-        errorPolicy: ErrorPolicy = .tryLater,
+		errorPolicy: ErrorPolicy = .tryLater,
 		enableGzip: Bool = false,
 		connectionProxyDictionary: [AnyHashable: Any]? = nil,
 		urlSessionDelegate: URLSessionDelegate? = nil,
@@ -144,7 +144,7 @@ public struct BucketWriterOptions: @unchecked Sendable {
 			throttleInterval: throttleInterval,
 			timeoutIntervalForRequest: timeoutIntervalForRequest,
 			timeoutIntervalForResource: timeoutIntervalForResource,
-            errorPolicy: errorPolicy,
+			errorPolicy: errorPolicy,
 			enableGzip: enableGzip,
 			connectionProxyDictionary: connectionProxyDictionary,
 			urlSessionDelegate: urlSessionDelegate,
@@ -153,34 +153,34 @@ public struct BucketWriterOptions: @unchecked Sendable {
 		)
 	}
 
-    public enum ErrorPolicy: Sendable {
+	public enum ErrorPolicy: Sendable {
 
-        /// Try to write the data later. The batches  limit is the maximum number of batches to keep in memory.
-        case tryLater(batchesLimit: Int)
-        /// Skip the data and continue.
-        case skip
+		/// Try to write the data later. The batches  limit is the maximum number of batches to keep in memory.
+		case tryLater(batchesLimit: Int)
+		/// Skip the data and continue.
+		case skip
 
-        public static var tryLater: Self { .tryLater(batchesLimit: 5) }
-    }
+		public static var tryLater: Self { .tryLater(batchesLimit: 5) }
+	}
 }
 
 package struct InfluxDBWriter: Sendable {
 
-    package static let loggerLabel = "swift-influxdb-telemetry"
+	package static let loggerLabel = "swift-influxdb-telemetry"
 
 	package let labelsAsTags: LabelsSet
 	package let intervalType: IntervalType
-    private let telemetryType: String
+	private let telemetryType: String
 	private let api: SwiftInfluxAPI
 
 	package init(
 		options: BucketWriterOptions,
 		intervalType: IntervalType = .irregular,
 		labelsAsTags: LabelsSet,
-        telemetryType: String
+		telemetryType: String
 	) {
 		self.labelsAsTags = labelsAsTags
-        self.telemetryType = telemetryType
+		self.telemetryType = telemetryType
 		self.intervalType = intervalType
 		api = .make(options: options)
 	}
@@ -202,9 +202,9 @@ package struct InfluxDBWriter: Sendable {
 		date: Date = Date()
 	) {
 		let point = InfluxDBClient.Point(measurement)
-        point.addTag(key: "telemetry_type", value: telemetryType)
+		point.addTag(key: "telemetry_type", value: telemetryType)
 		for (key, value) in unspecified {
-			if labelsAsTags.contains(key) {
+			if labelsAsTags.contains(key, in: measurement) {
 				point.addTag(key: key, value: value.string)
 			} else {
 				point.addField(key: key, value: value)
@@ -250,7 +250,7 @@ private final actor SwiftInfluxAPI: Sendable {
 
 	private static let cache = NIOLockedValueBox([BatcherID: SwiftInfluxAPI]())
 
-    private let options: BucketWriterOptions
+	private let options: BucketWriterOptions
 	private let responsesQueue: DispatchQueue
 	private var points: [InfluxDBClient.Point]
 	private var writeTask: Task<Void, Error>?
@@ -389,26 +389,26 @@ private final actor SwiftInfluxAPI: Sendable {
 				points.removeFirst(batch.count)
 			}
 		} catch {
-            switch options.errorPolicy {
-            case let .tryLater(batchesLimit):
-                self.points = points.suffix(max(0, (batchesLimit * options.batchSize) - self.points.count)) + self.points
-            case .skip:
-                break
-            }
-            let logger = Logger(label: InfluxDBWriter.loggerLabel)
-            switch error {
-            case let InfluxDBClient.InfluxDBError.error(code, headers, body, underlying):
-                switch code {
-                case 413: // Request Entity Too Large
-                    logger.error("InfluxDB error: `Request Entity Too Large: \(body?.description ?? "")`")
-                case 429: // Too Many Requests
-                    logger.error("InfluxDB error: `Too Many Requests: \(body?.description ?? "")`")
-                default:
-                    logger.error("InfluxDB error: `Code: \(code), body: \(body?.description ?? "")`")
-                }
-            default:
-                logger.error("InfluxDB error: `\(error)`")
-            }
+			switch options.errorPolicy {
+			case let .tryLater(batchesLimit):
+				self.points = points.suffix(max(0, (batchesLimit * options.batchSize) - self.points.count)) + self.points
+			case .skip:
+				break
+			}
+			let logger = Logger(label: InfluxDBWriter.loggerLabel)
+			switch error {
+			case let InfluxDBClient.InfluxDBError.error(code, _, body, _):
+				switch code {
+				case 413: // Request Entity Too Large
+					logger.error("InfluxDB error: `Request Entity Too Large: \(body?.description ?? "")`")
+				case 429: // Too Many Requests
+					logger.error("InfluxDB error: `Too Many Requests: \(body?.description ?? "")`")
+				default:
+					logger.error("InfluxDB error: `Code: \(code), body: \(body?.description ?? "")`")
+				}
+			default:
+				logger.error("InfluxDB error: `\(error)`")
+			}
 		}
 	}
 }

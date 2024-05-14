@@ -48,8 +48,8 @@ public struct InfluxDBMetricsFactory: Sendable {
 		api = InfluxDBWriter(
 			options: options,
 			intervalType: intervalType,
-            labelsAsTags: dimensionsLabelsAsTags,
-            telemetryType: "metrics"
+			labelsAsTags: dimensionsLabelsAsTags,
+			telemetryType: "metrics"
 		)
 		self.dimensions = dimensions
 	}
@@ -183,7 +183,12 @@ private extension InfluxDBMetricsFactory {
 	func makeHandler<H: InfluxMetric>(type: String, label: String, dimensions: [(String, String)], create: (HandlerID, [(String, String)]) -> H) -> H {
 		box.withLockedValue { store -> H in
 			var dimensions = self.dimensions + dimensions
-			let id = HandlerID(label: label, type: type, dimensions: &dimensions, labelsAsTags: api.labelsAsTags)
+			let id = HandlerID(
+				label: label,
+				type: type,
+				dimensions: &dimensions,
+				labelsAsTags: api.labelsAsTags
+			)
 			guard let value = store[id] as? H else {
 				if store[id] != nil {
 					Logger(label: "SwiftInfluxDBMetrics")
