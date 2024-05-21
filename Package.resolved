@@ -21,9 +21,9 @@
     {
       "identity" : "influxdb-client-swift",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/dankinsoid/influxdb-client-swift.git",
+      "location" : "https://github.com/influxdata/influxdb-client-swift.git",
       "state" : {
-        "revision" : "92ebb73336aef8aaf7f17b77d34715cc2071c50a",
+        "revision" : "6f79af75a7958142add2e811dc0a6a6ae6507bd2",
         "version" : "1.7.0"
       }
     },

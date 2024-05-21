@@ -16,7 +16,7 @@ let package = Package(
 		.library(name: "InfluxDBTracing", targets: ["InfluxDBTracing"]),
 	],
 	dependencies: [
-		.package(url: "https://github.com/dankinsoid/influxdb-client-swift.git", from: "1.7.0"), // wait for PR
+		.package(url: "https://github.com/influxdata/influxdb-client-swift.git", from: "1.7.0"),
 		.package(url: "https://github.com/apple/swift-metrics.git", from: "2.4.0"),
 		.package(url: "https://github.com/apple/swift-log.git", from: "1.5.0"),
 		.package(url: "https://github.com/apple/swift-atomics.git", from: "1.2.0"),
