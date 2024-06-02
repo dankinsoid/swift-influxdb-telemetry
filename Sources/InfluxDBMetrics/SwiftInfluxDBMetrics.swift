@@ -25,10 +25,10 @@ import Logging
 ///     )
 /// )
 /// ```
-public struct InfluxDBMetricsFactory: Sendable {
+public struct InfluxDBMetricsFactory: @unchecked Sendable {
 
 	private let api: InfluxDBWriter
-	private let box = NIOLockedValueBox([HandlerID: InfluxMetric]())
+	private let box = NIOLockedValueBox([AnyHashable: InfluxMetric]())
 	private let dimensions: [(String, String)]
     private let coldStart: Bool
     private let identifyingPolicy: MetricIdentifyingPolicy
@@ -203,12 +203,13 @@ private extension InfluxDBMetricsFactory {
 	func makeHandler<H: InfluxMetric>(type: String, label: String, dimensions: [(String, String)], create: (HandlerID, [(String, String)]) -> H) -> H {
         box.withLockedValue { store -> H in
             var dimensions = self.dimensions + dimensions
-            let id = HandlerID(
+            let handlerID = HandlerID(
                 label: label,
                 type: type,
                 dimensions: &dimensions,
-                labelsAsTags: identifyingPolicy == .byLabelAndDimensions ? api.labelsAsTags : []
+                labelsAsTags: api.labelsAsTags
             )
+            let id: AnyHashable = identifyingPolicy == .byLabel ? HandlerIDNoTags(label: label, type: type) : handlerID
             if let value = store[id] as? H {
                 return value
             }
@@ -216,7 +217,7 @@ private extension InfluxDBMetricsFactory {
                 Logger(label: "SwiftInfluxDBMetrics")
                     .error("A metric named '\(label)' already exists.")
             }
-            let handler = create(id, dimensions)
+            let handler = create(handlerID, dimensions)
             store[id] = handler
             return handler
         }

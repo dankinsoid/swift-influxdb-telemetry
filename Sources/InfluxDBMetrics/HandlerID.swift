@@ -22,3 +22,9 @@ struct HandlerID: Hashable {
 		dimensions = fields
 	}
 }
+
+struct HandlerIDNoTags: Hashable {
+    
+    var label: String
+    var type: String
+}
