@@ -7,8 +7,9 @@ final class FloatingCounter: InfluxMetric, FloatingPointCounterHandler {
 
 	var id: HandlerID { handler.id }
 	let handler: InfluxMetricHandler<UInt64>
+    let coldStart: Bool
 
-	init(api: InfluxDBWriter, id: HandlerID, fields: [(String, String)]) {
+	init(api: InfluxDBWriter, id: HandlerID, fields: [(String, String)], coldStart: Bool) {
 		handler = InfluxMetricHandler(id: id, fields: fields, api: api) {
 			.double(Double(bitPattern: $0))
 		} loaded: { decodable in
@@ -17,10 +18,11 @@ final class FloatingCounter: InfluxMetric, FloatingPointCounterHandler {
 			}
 			return nil
 		}
+        self.coldStart = coldStart
 	}
 
 	func increment(by amount: Double) {
-		handler.modify(loadValues: true) {
+		handler.modify(loadValues: !coldStart) {
 			// We busy loop here until we can update the atomic successfully.
 			// Using relaxed ordering here is sufficient, since the as-if rules guarantess that
 			// the following operations are executed in the order presented here. Every statement

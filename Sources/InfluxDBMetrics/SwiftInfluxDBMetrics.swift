@@ -30,6 +30,7 @@ public struct InfluxDBMetricsFactory: Sendable {
 	private let api: InfluxDBWriter
 	private let box = NIOLockedValueBox([HandlerID: InfluxMetric]())
 	private let dimensions: [(String, String)]
+    private let coldStart: Bool
 
 	/// Create a new `InfluxDBMetricsFactory`.
 	/// - Parameters:
@@ -39,11 +40,13 @@ public struct InfluxDBMetricsFactory: Sendable {
 	///   Regular interval type creates a timer with a fixed interval and sends all collected metrics every interval. Irregular interval type sends metrics only when they are triggered. Defaults to irregular.
 	///   - dimensionsLabelsAsTags: The set of labels to use as tags. Defaults to all.
 	///   - dimensions: Global dimensions for all metrics. Defaults to `[]`.
+    ///   - coldStart: A Boolean value indicating whether the metrics should reset on the first start. `true` if the metrics reset on the initial launch; `false` if the metrics persist across launches.
 	public init(
 		options: BucketWriterOptions,
 		intervalType: IntervalType = .irregular,
 		dimensionsLabelsAsTags: LabelsSet = .all,
-		dimensions: [(String, String)] = []
+		dimensions: [(String, String)] = [],
+        coldStart: Bool = false
 	) {
 		api = InfluxDBWriter(
 			options: options,
@@ -51,6 +54,7 @@ public struct InfluxDBMetricsFactory: Sendable {
 			labelsAsTags: dimensionsLabelsAsTags,
 			telemetryType: "metrics"
 		)
+        self.coldStart = coldStart
 		self.dimensions = dimensions
 	}
 
@@ -75,6 +79,7 @@ public struct InfluxDBMetricsFactory: Sendable {
 	///   Regular interval type creates a timer with a fixed interval and sends all collected metrics every interval. Irregular interval type sends metrics only when they are triggered. Defaults to irregular.
 	///   - dimensionsLabelsAsTags: The set of labels to use as tags. Defaults to all.
 	///   - dimensions: Global dimensions for all metrics. Defaults to `[]`.
+    ///   - coldStart: A Boolean value indicating whether the metrics should reset on the first start. `true` if the metrics reset on the initial launch; `false` if the metrics persist across launches.
 	public init(
 		url: String,
 		token: String,
@@ -92,7 +97,8 @@ public struct InfluxDBMetricsFactory: Sendable {
 		protocolClasses: [AnyClass]? = nil,
 		intervalType: IntervalType = .irregular,
 		dimensionsLabelsAsTags: LabelsSet = .all,
-		dimensions: [(String, String)] = []
+		dimensions: [(String, String)] = [],
+        coldStart: Bool = false
 	) {
 		self.init(
 			options: BucketWriterOptions(
@@ -113,7 +119,8 @@ public struct InfluxDBMetricsFactory: Sendable {
 			),
 			intervalType: intervalType,
 			dimensionsLabelsAsTags: dimensionsLabelsAsTags,
-			dimensions: dimensions
+			dimensions: dimensions,
+            coldStart: coldStart
 		)
 	}
 }
@@ -122,7 +129,7 @@ extension InfluxDBMetricsFactory: MetricsFactory {
 
 	public func makeCounter(label: String, dimensions: [(String, String)]) -> CounterHandler {
 		makeHandler(type: "counter", label: label, dimensions: dimensions) { id, fields in
-			Counter(api: api, id: id, fields: fields)
+			Counter(api: api, id: id, fields: fields, coldStart: coldStart)
 		}
 	}
 
@@ -140,7 +147,7 @@ extension InfluxDBMetricsFactory: MetricsFactory {
 			return makeFloatingPointCounter(type: type, label: label, dimensions: dimensions)
 		}
 		return makeHandler(type: type, label: label, dimensions: dimensions) { id, fields in
-			AggregateRecorder(api: api, id: id, fields: fields)
+			AggregateRecorder(api: api, id: id, fields: fields, coldStart: coldStart)
 		}
 	}
 
@@ -175,7 +182,7 @@ private extension InfluxDBMetricsFactory {
 
 	func makeFloatingPointCounter(type: String, label: String, dimensions: [(String, String)]) -> FloatingCounter {
 		makeHandler(type: type, label: label, dimensions: dimensions) { id, fields in
-			FloatingCounter(api: api, id: id, fields: fields)
+			FloatingCounter(api: api, id: id, fields: fields, coldStart: coldStart)
 		}
 	}
 

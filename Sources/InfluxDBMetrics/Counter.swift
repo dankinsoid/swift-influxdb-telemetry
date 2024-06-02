@@ -7,8 +7,9 @@ final class Counter: InfluxMetric, CounterHandler {
 
 	var id: HandlerID { handler.id }
 	let handler: InfluxMetricHandler<Int>
+    let coldStart: Bool
 
-	init(api: InfluxDBWriter, id: HandlerID, fields: [(String, String)]) {
+    init(api: InfluxDBWriter, id: HandlerID, fields: [(String, String)], coldStart: Bool) {
 		handler = InfluxMetricHandler(id: id, fields: fields, api: api) {
 			.int($0)
 		} loaded: { decodable in
@@ -17,10 +18,11 @@ final class Counter: InfluxMetric, CounterHandler {
 			}
 			return nil
 		}
+        self.coldStart = coldStart
 	}
 
 	func increment(by amount: Int64) {
-		handler.modify(loadValues: true) {
+		handler.modify(loadValues: !coldStart) {
 			$0.wrappingIncrement(by: Int(amount), ordering: .relaxed)
 		}
 	}
