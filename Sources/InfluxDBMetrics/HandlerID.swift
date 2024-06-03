@@ -1,13 +1,13 @@
 import Foundation
 import SwiftInfluxDBCore
 
-struct HandlerID: Hashable {
+struct HandlerID: Hashable, Sendable {
 
 	var label: String
 	var type: String
-	var tags: [String: String]
+    var tags: [String: String]
 
-	init(label: String, type: String, dimensions: inout [(String, String)], labelsAsTags: LabelsSet) {
+	init(label: String, type: String, dimensions: [(String, String)], labelsAsTags: LabelsSet) {
 		tags = [:]
 		self.label = label
 		self.type = type
@@ -19,7 +19,6 @@ struct HandlerID: Hashable {
 				fields.append((key, value))
 			}
 		}
-		dimensions = fields
 	}
 }
 

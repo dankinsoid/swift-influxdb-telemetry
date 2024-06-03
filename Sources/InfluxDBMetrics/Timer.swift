@@ -7,15 +7,17 @@ final class TimerMetric: InfluxMetric, TimerHandler {
 
 	var id: HandlerID { handler.id }
 	let handler: InfluxMetricHandler<Int>
-
-	init(api: InfluxDBWriter, id: HandlerID, fields: [(String, String)]) {
-		handler = InfluxMetricHandler(id: id, fields: fields, api: api) {
-			.int($0)
-		}
-	}
+    let dimensions: [(String, String)]
+    let coldStart: Bool
+    
+    init(handler: InfluxMetricHandler<Int>, dimensions: [(String, String)], coldStart: Bool) {
+        self.handler = handler
+        self.coldStart = coldStart
+        self.dimensions = dimensions
+    }
 
 	func recordNanoseconds(_ duration: Int64) {
-		handler.modify {
+        handler.modify(dimensions: dimensions) {
 			$0.store(Int(duration), ordering: .relaxed)
 		}
 	}

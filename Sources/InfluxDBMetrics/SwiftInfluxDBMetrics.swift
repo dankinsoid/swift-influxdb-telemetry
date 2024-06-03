@@ -28,7 +28,7 @@ import Logging
 public struct InfluxDBMetricsFactory: @unchecked Sendable {
 
 	private let api: InfluxDBWriter
-	private let box = NIOLockedValueBox([AnyHashable: InfluxMetric]())
+	private let box = NIOLockedValueBox([AnyHashable: AnyInfluxMetricHandler]())
 	private let dimensions: [(String, String)]
     private let coldStart: Bool
     private let identifyingPolicy: MetricIdentifyingPolicy
@@ -141,9 +141,7 @@ public struct InfluxDBMetricsFactory: @unchecked Sendable {
 extension InfluxDBMetricsFactory: MetricsFactory {
 
 	public func makeCounter(label: String, dimensions: [(String, String)]) -> CounterHandler {
-		makeHandler(type: "counter", label: label, dimensions: dimensions) { id, fields in
-			Counter(api: api, id: id, fields: fields, coldStart: coldStart)
-		}
+        makeHandler(Counter.self, type: "counter", label: label, dimensions: dimensions)
 	}
 
 	public func makeFloatingPointCounter(label: String, dimensions: [(String, String)]) -> FloatingPointCounterHandler {
@@ -159,9 +157,7 @@ extension InfluxDBMetricsFactory: MetricsFactory {
 		guard aggregate else {
 			return makeFloatingPointCounter(type: type, label: label, dimensions: dimensions)
 		}
-		return makeHandler(type: type, label: label, dimensions: dimensions) { id, fields in
-			AggregateRecorder(api: api, id: id, fields: fields, coldStart: coldStart)
-		}
+        return makeHandler(AggregateRecorder.self, type: type, label: label, dimensions: dimensions)
 	}
 
 	public func makeMeter(label: String, dimensions: [(String, String)]) -> MeterHandler {
@@ -169,9 +165,7 @@ extension InfluxDBMetricsFactory: MetricsFactory {
 	}
 
 	public func makeTimer(label: String, dimensions: [(String, String)]) -> TimerHandler {
-		makeHandler(type: "timer", label: label, dimensions: dimensions) { id, fields in
-			TimerMetric(api: api, id: id, fields: fields)
-		}
+        makeHandler(TimerMetric.self, type: "timer", label: label, dimensions: dimensions)
 	}
 
 	public func destroyCounter(_ handler: CounterHandler) { destroy(handler) }
@@ -185,7 +179,7 @@ private extension InfluxDBMetricsFactory {
 
 	@inline(__always)
 	func destroy(_ handler: Any) {
-		guard let metric = handler as? InfluxMetric else {
+		guard let metric = handler as? any InfluxMetric else {
 			return
 		}
 		return box.withLockedValue { store in
@@ -194,32 +188,35 @@ private extension InfluxDBMetricsFactory {
 	}
 
 	func makeFloatingPointCounter(type: String, label: String, dimensions: [(String, String)]) -> FloatingCounter {
-		makeHandler(type: type, label: label, dimensions: dimensions) { id, fields in
-			FloatingCounter(api: api, id: id, fields: fields, coldStart: coldStart)
-		}
+        makeHandler(FloatingCounter.self, type: type, label: label, dimensions: dimensions)
 	}
 
 	@inline(__always)
-	func makeHandler<H: InfluxMetric>(type: String, label: String, dimensions: [(String, String)], create: (HandlerID, [(String, String)]) -> H) -> H {
+    func makeHandler<H: InfluxMetric>(_: H.Type, type: String, label: String, dimensions: [(String, String)]) -> H {
         box.withLockedValue { store -> H in
-            var dimensions = self.dimensions + dimensions
+            let dimensions = self.dimensions + dimensions
             let handlerID = HandlerID(
                 label: label,
                 type: type,
-                dimensions: &dimensions,
+                dimensions: identifyingPolicy == .byLabel ? [] : dimensions,
                 labelsAsTags: api.labelsAsTags
             )
-            let id: AnyHashable = identifyingPolicy == .byLabel ? HandlerIDNoTags(label: label, type: type) : handlerID
-            if let value = store[id] as? H {
-                return value
+            if let value = store[handlerID] as? H.Handler {
+                return H.init(handler: value, dimensions: dimensions, coldStart: coldStart)
             }
-            if store[id] != nil {
+            if store[handlerID] != nil {
                 Logger(label: "SwiftInfluxDBMetrics")
                     .error("A metric named '\(label)' already exists.")
             }
-            let handler = create(handlerID, dimensions)
-            store[id] = handler
-            return handler
+            
+            let handler = H.Handler.init(id: handlerID, api: api)
+            store[handlerID] = handler
+
+            return H.init(
+                handler: handler,
+                dimensions: dimensions,
+                coldStart: coldStart
+            )
         }
 	}
 }

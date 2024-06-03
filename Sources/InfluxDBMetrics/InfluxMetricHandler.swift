@@ -3,31 +3,34 @@ import Foundation
 import InfluxDBSwift
 import SwiftInfluxDBCore
 
-final class InfluxMetricHandler<Value: AtomicValue & ExpressibleByIntegerLiteral & Sendable>: Sendable where Value.AtomicRepresentation.Value == Value {
+protocol InfluxMetricValue: Sendable where AsAtomic.AtomicRepresentation.Value == AsAtomic {
+
+    associatedtype AsAtomic: AtomicValue & ExpressibleByIntegerLiteral & Sendable
+    static func fieldValue(from value: AsAtomic.AtomicRepresentation.Value) -> InfluxDBClient.Point.FieldValue
+    static func loaded(from decodable: Decodable) -> AsAtomic?
+}
+
+protocol AnyInfluxMetricHandler: Sendable {
+    var id: HandlerID { get }
+    init(id: HandlerID, api: InfluxDBWriter)
+}
+
+final class InfluxMetricHandler<Value: InfluxMetricValue>: AnyInfluxMetricHandler {
 
 	let id: HandlerID
-	private let fields: [(String, String)]
 	private let didLoad = ManagedAtomic(false)
-	private let atomic = ManagedAtomic(0 as Value)
+    private let atomic = ManagedAtomic(0 as Value.AsAtomic)
 	private let intervalTask = NIOLockedValueBox<Task<Void, Error>?>(nil)
 	private let query = NIOLockedValueBox([@Sendable (Bool) -> Void]())
 	private let api: InfluxDBWriter
-	private let toValue: @Sendable (Decodable) -> Value?
-	private let value: @Sendable (Value.AtomicRepresentation.Value) -> InfluxDBClient.Point.FieldValue
 	private let uuid = UUID()
 
 	init(
 		id: HandlerID,
-		fields: [(String, String)],
-		api: InfluxDBWriter,
-		value: @Sendable @escaping (Value.AtomicRepresentation.Value) -> InfluxDBClient.Point.FieldValue,
-		loaded: @Sendable @escaping (Decodable) -> Value? = { _ in nil }
+		api: InfluxDBWriter
 	) {
 		self.api = api
 		self.id = id
-		self.value = value
-		self.fields = fields
-		toValue = loaded
 	}
 
 	deinit {
@@ -35,35 +38,34 @@ final class InfluxMetricHandler<Value: AtomicValue & ExpressibleByIntegerLiteral
 	}
 
 	func modify(
+        dimensions: [(String, String)],
 		loadValues: Bool = false,
-		_ operation: @Sendable @escaping (ManagedAtomic<Value>) -> Void
+        _ operation: @Sendable @escaping (ManagedAtomic<Value.AsAtomic>) -> Void
 	) {
 		let prependDate = Date()
 		let date = Date()
 		let writeOperation: @Sendable (Bool) -> Void = { [weak self] prependValue in
 			guard let self else { return }
 			if prependValue {
-				self.write(date: prependDate)
+                self.write(dimensions: dimensions, date: prependDate)
 			}
 			operation(self.atomic)
-			self.write(date: date)
+            self.write(dimensions: dimensions, date: date)
 		}
 		let isLoading = !query.withLockedValue(\.isEmpty)
 		if isLoading || loadValues && !didLoad.load(ordering: .sequentiallyConsistent) {
-			addOperationToQueue(writeOperation)
+            addOperationToQueue(writeOperation)
 		} else {
 			writeOperation(false)
 		}
 	}
 
-	private func write(date: Date) {
-		var fields = Dictionary(fields) { _, n in n }.mapValues(InfluxDBClient.Point.FieldValue.string)
-		fields["value"] = value(atomic.load(ordering: .relaxed))
+	private func write(dimensions: [(String, String)], date: Date) {
 		api.write(
 			measurement: id.label,
-			tags: id.tags,
-			fields: fields,
-			unspecified: [],
+            tags: [:],
+            fields: ["value": Value.fieldValue(from: atomic.load(ordering: .relaxed))],
+            unspecified: dimensions.map { ($0.0, .string($0.1)) },
 			measurementID: uuid,
 			date: date
 		)
@@ -88,7 +90,7 @@ final class InfluxMetricHandler<Value: AtomicValue & ExpressibleByIntegerLiteral
 		do {
 			if
 				let result = try await api.load(measurement: id.label, tags: id.tags, fields: ["value"]),
-				let value = result.values["_value"].flatMap(toValue)
+                let value = result.values["_value"].flatMap(Value.loaded)
 			{
 				atomic.store(value, ordering: .sequentiallyConsistent)
 			} else {
@@ -103,4 +105,32 @@ final class InfluxMetricHandler<Value: AtomicValue & ExpressibleByIntegerLiteral
 		}
 		didLoad.store(true, ordering: .sequentiallyConsistent)
 	}
+}
+
+extension Int: InfluxMetricValue {
+
+    static func fieldValue(from value: Int) -> InfluxDBSwift.InfluxDBClient.Point.FieldValue {
+        .int(value)
+    }
+
+    static func loaded(from decodable: any Decodable) -> Int? {
+        if let int = decodable as? any FixedWidthInteger {
+            return Int(int)
+        }
+        return nil
+    }
+}
+
+extension Double: InfluxMetricValue {
+
+    static func fieldValue(from value: UInt64) -> InfluxDBClient.Point.FieldValue {
+        .double(Double(bitPattern: value))
+    }
+
+    static func loaded(from decodable: any Decodable) -> UInt64? {
+        if let double = decodable as? any BinaryFloatingPoint {
+            return Double(double).bitPattern
+        }
+        return nil
+    }
 }

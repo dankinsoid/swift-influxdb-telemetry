@@ -6,31 +6,25 @@ import SwiftInfluxDBCore
 final class AggregateRecorder: InfluxMetric, RecorderHandler {
 
 	var id: HandlerID { handler.id }
-	let handler: InfluxMetricHandler<UInt64>
-	let countHandler: InfluxMetricHandler<Int>
+	let handler: InfluxMetricHandler<Double>
+    let counter: CoreMetrics.Counter
     let coldStart: Bool
+    let dimensions: [(String, String)]
 
-	init(api: InfluxDBWriter, id: HandlerID, fields: [(String, String)], coldStart: Bool) {
-		handler = InfluxMetricHandler(id: id, fields: fields, api: api) {
-			.double(Double(bitPattern: $0))
-		}
-		var counterID = id
-		counterID.label += "_total"
-		countHandler = InfluxMetricHandler(id: counterID, fields: fields, api: api) {
-			.int($0)
-		}
+    init(handler: InfluxMetricHandler<Double>, dimensions: [(String, String)], coldStart: Bool) {
+        self.handler = handler
         self.coldStart = coldStart
-	}
+        self.dimensions = dimensions
+        counter = CoreMetrics.Counter(label: handler.id.label + "_total", dimensions: dimensions)
+    }
 
 	func record(_ value: Int64) {
 		record(Double(value))
 	}
 
 	func record(_ value: Double) {
-		countHandler.modify(loadValues: !coldStart) {
-			$0.wrappingDecrement(by: 1, ordering: .relaxed)
-		}
-		handler.modify {
+        counter.increment()
+        handler.modify(dimensions: dimensions) {
 			$0.store(value.bitPattern, ordering: .relaxed)
 		}
 	}

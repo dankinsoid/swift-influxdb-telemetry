@@ -6,23 +6,18 @@ import SwiftInfluxDBCore
 final class FloatingCounter: InfluxMetric, FloatingPointCounterHandler {
 
 	var id: HandlerID { handler.id }
-	let handler: InfluxMetricHandler<UInt64>
+	let handler: InfluxMetricHandler<Double>
     let coldStart: Bool
-
-	init(api: InfluxDBWriter, id: HandlerID, fields: [(String, String)], coldStart: Bool) {
-		handler = InfluxMetricHandler(id: id, fields: fields, api: api) {
-			.double(Double(bitPattern: $0))
-		} loaded: { decodable in
-			if let double = decodable as? any BinaryFloatingPoint {
-				return Double(double).bitPattern
-			}
-			return nil
-		}
+    let dimensions: [(String, String)]
+    
+    init(handler: InfluxMetricHandler<Double>, dimensions: [(String, String)], coldStart: Bool) {
+        self.handler = handler
         self.coldStart = coldStart
-	}
+        self.dimensions = dimensions
+    }
 
 	func increment(by amount: Double) {
-		handler.modify(loadValues: !coldStart) {
+        handler.modify(dimensions: dimensions, loadValues: !coldStart) {
 			// We busy loop here until we can update the atomic successfully.
 			// Using relaxed ordering here is sufficient, since the as-if rules guarantess that
 			// the following operations are executed in the order presented here. Every statement
@@ -43,7 +38,7 @@ final class FloatingCounter: InfluxMetric, FloatingPointCounterHandler {
 	}
 
 	func reset() {
-		handler.modify {
+        handler.modify(dimensions: dimensions) {
 			$0.store(Double.zero.bitPattern, ordering: .relaxed)
 		}
 	}
@@ -56,7 +51,7 @@ extension FloatingCounter: MeterHandler {
 	}
 
 	func set(_ value: Double) {
-		handler.modify {
+        handler.modify(dimensions: dimensions) {
 			$0.store(value.bitPattern, ordering: .relaxed)
 		}
 	}
