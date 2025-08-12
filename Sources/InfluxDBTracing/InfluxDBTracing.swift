@@ -29,6 +29,7 @@ public struct InfluxDBTracer: Tracer {
 
 	let api: InfluxDBWriter
 	let measurementNamePolicy: MeasurementNamePolicy
+	let labelsAsTags: LabelsSet
 
 	/// Create a new `InfluxDBTracer`.
 	/// - Parameters:
@@ -40,12 +41,9 @@ public struct InfluxDBTracer: Tracer {
 		measurementNamePolicy: MeasurementNamePolicy = .global,
 		attributesLabelsAsTags: LabelsSet = .empty
 	) {
-		api = InfluxDBWriter(
-			options: options,
-			labelsAsTags: attributesLabelsAsTags,
-			telemetryType: "tracing"
-		)
+		api = InfluxDBWriter(options: options)
 		self.measurementNamePolicy = measurementNamePolicy
+		self.labelsAsTags = attributesLabelsAsTags
 	}
 
 	/// Create a new `InfluxDBTracer`.
@@ -168,7 +166,7 @@ public struct InfluxDBTracer: Tracer {
 			context: context(),
 			attributes: [:],
 			startTimeNanosecondsSinceEpoch: startNano
-		) { [api] span, endTimeNanosecondsSinceEpoch in
+		) { [api, labelsAsTags] span, endTimeNanosecondsSinceEpoch in
 			var parameters: [(String, InfluxDBClient.Point.FieldValue)] = []
 			let measurement = measurementNamePolicy.measurement(span.operationName)
 			span.attributes.forEach { name, attribute in
@@ -197,7 +195,9 @@ public struct InfluxDBTracer: Tracer {
 				]
 				.compactMapValues { $0 },
 				unspecified: parameters,
-				measurementID: UUID()
+				measurementID: UUID(),
+				telemetryType: "tracing",
+				labelsAsTags: labelsAsTags
 			)
 		}
 	}

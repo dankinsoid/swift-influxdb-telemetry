@@ -27,12 +27,35 @@ import Logging
 /// ```
 public struct InfluxDBMetricsFactory: @unchecked Sendable {
 
-	private let api: InfluxDBWriter
+	private let api: InfluxDBPointsWriter
 	private let box = NIOLockedValueBox([AnyHashable: AnyInfluxMetricHandler]())
 	private let dimensions: [(String, String)]
-    private let coldStart: Bool
     private let identifyingPolicy: MetricIdentifyingPolicy
+	private let labelsAsTags: LabelsSet
 
+	/// Create a new `InfluxDBMetricsFactory`.
+	/// - Parameters:
+	///   - writer: The InfluxDB writer.
+	///   Difference between them you can found in [InfluxDB documentation](https://www.influxdata.com/blog/what-is-the-difference-between-metrics-and-events/).
+	///   Regular interval type creates a timer with a fixed interval and sends all collected metrics every interval. Irregular interval type sends metrics only when they are triggered. Defaults to irregular.
+	///   - dimensionsLabelsAsTags: The set of labels to use as tags. Defaults to all.
+	///   - dimensions: Global dimensions for all metrics. Defaults to `[]`.
+		///   - identifyingPolicy: A policy that determines how metrics counters are identified.
+		///   This can be based on label alone or by a combination of label and dimension.
+		///   Using labels provides a broad identification, while including dimensions allows
+		///   for more granular and contextual tracking of metrics.
+	public init(
+		writer: InfluxDBPointsWriter,
+		dimensionsLabelsAsTags: LabelsSet = .all,
+		dimensions: [(String, String)] = [],
+		identifyingPolicy: MetricIdentifyingPolicy = .byLabelAndDimensions
+	) {
+		api = writer
+		self.dimensions = dimensions
+		self.identifyingPolicy = identifyingPolicy
+		self.labelsAsTags = dimensionsLabelsAsTags
+	}
+	
 	/// Create a new `InfluxDBMetricsFactory`.
 	/// - Parameters:
 	///   - options: The InfluxDB writer options.
@@ -45,24 +68,20 @@ public struct InfluxDBMetricsFactory: @unchecked Sendable {
     ///   This can be based on label alone or by a combination of label and dimension.
     ///   Using labels provides a broad identification, while including dimensions allows
     ///   for more granular and contextual tracking of metrics.
-    ///   - coldStart: A Boolean value indicating whether the metrics should reset on the first start. `true` if the metrics reset on the initial launch; `false` if the metrics persist across launches.
 	public init(
 		options: BucketWriterOptions,
 		intervalType: IntervalType = .irregular,
 		dimensionsLabelsAsTags: LabelsSet = .all,
 		dimensions: [(String, String)] = [],
-        identifyingPolicy: MetricIdentifyingPolicy = .byLabelAndDimensions,
-        coldStart: Bool = false
+        identifyingPolicy: MetricIdentifyingPolicy = .byLabelAndDimensions
 	) {
 		api = InfluxDBWriter(
 			options: options,
-			intervalType: intervalType,
-			labelsAsTags: dimensionsLabelsAsTags,
-			telemetryType: "metrics"
+			intervalType: intervalType
 		)
-        self.coldStart = coldStart
 		self.dimensions = dimensions
-        self.identifyingPolicy = identifyingPolicy
+		self.identifyingPolicy = identifyingPolicy
+		self.labelsAsTags = dimensionsLabelsAsTags
 	}
 
 	/// Create a new `InfluxDBMetricsFactory`.
@@ -109,8 +128,7 @@ public struct InfluxDBMetricsFactory: @unchecked Sendable {
 		intervalType: IntervalType = .irregular,
 		dimensionsLabelsAsTags: LabelsSet = .all,
 		dimensions: [(String, String)] = [],
-        identifyingPolicy: MetricIdentifyingPolicy = .byLabelAndDimensions,
-        coldStart: Bool = false
+		identifyingPolicy: MetricIdentifyingPolicy = .byLabelAndDimensions
 	) {
 		self.init(
 			options: BucketWriterOptions(
@@ -132,8 +150,7 @@ public struct InfluxDBMetricsFactory: @unchecked Sendable {
 			intervalType: intervalType,
 			dimensionsLabelsAsTags: dimensionsLabelsAsTags,
 			dimensions: dimensions,
-            identifyingPolicy: identifyingPolicy,
-            coldStart: coldStart
+			identifyingPolicy: identifyingPolicy
 		)
 	}
 }
@@ -141,7 +158,7 @@ public struct InfluxDBMetricsFactory: @unchecked Sendable {
 extension InfluxDBMetricsFactory: MetricsFactory {
 
 	public func makeCounter(label: String, dimensions: [(String, String)]) -> CounterHandler {
-        makeHandler(Counter.self, type: "counter", label: label, dimensions: dimensions)
+		makeHandler(Counter.self, type: "counter", label: label, dimensions: dimensions)
 	}
 
 	public func makeFloatingPointCounter(label: String, dimensions: [(String, String)]) -> FloatingPointCounterHandler {
@@ -192,31 +209,30 @@ private extension InfluxDBMetricsFactory {
 	}
 
 	@inline(__always)
-    func makeHandler<H: InfluxMetric>(_: H.Type, type: String, label: String, dimensions: [(String, String)]) -> H {
-        box.withLockedValue { store -> H in
-            let dimensions = self.dimensions + dimensions
-            let handlerID = HandlerID(
-                label: label,
-                type: type,
-                dimensions: identifyingPolicy == .byLabel ? [] : dimensions,
-                labelsAsTags: api.labelsAsTags
-            )
-            if let value = store[handlerID] as? H.Handler {
-                return H.init(handler: value, dimensions: dimensions, coldStart: coldStart)
-            }
-            if store[handlerID] != nil {
-                Logger(label: "SwiftInfluxDBMetrics")
-                    .error("A metric named '\(label)' already exists.")
-            }
-            
-            let handler = H.Handler.init(id: handlerID, api: api)
-            store[handlerID] = handler
-
-            return H.init(
-                handler: handler,
-                dimensions: dimensions,
-                coldStart: coldStart
-            )
-        }
+	func makeHandler<H: InfluxMetric>(_: H.Type, type: String, label: String, dimensions: [(String, String)]) -> H {
+		box.withLockedValue { store -> H in
+			let dimensions = self.dimensions + dimensions
+			let handlerID = HandlerID(
+				label: label,
+				type: type,
+				dimensions: identifyingPolicy == .byLabel ? [] : dimensions,
+				labelsAsTags: labelsAsTags
+			)
+			if let value = store[handlerID] as? H.Handler {
+				return H.init(handler: value, dimensions: dimensions)
+			}
+			if store[handlerID] != nil {
+				Logger(label: "SwiftInfluxDBMetrics")
+					.error("A metric named '\(label)' already exists.")
+			}
+			
+			let handler = H.Handler(id: handlerID, writer: api, labelsAsTags: labelsAsTags)
+			store[handlerID] = handler
+			
+			return H.init(
+				handler: handler,
+				dimensions: dimensions
+			)
+		}
 	}
 }

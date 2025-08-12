@@ -164,23 +164,17 @@ public struct BucketWriterOptions: @unchecked Sendable {
 	}
 }
 
-package struct InfluxDBWriter: Sendable {
+package struct InfluxDBWriter: InfluxDBPointsWriter {
 
 	package static let loggerLabel = "swift-influxdb-telemetry"
 
-	package let labelsAsTags: LabelsSet
 	package let intervalType: IntervalType
-	private let telemetryType: String
 	private let api: SwiftInfluxAPI
 
 	package init(
 		options: BucketWriterOptions,
-		intervalType: IntervalType = .irregular,
-		labelsAsTags: LabelsSet,
-		telemetryType: String
+		intervalType: IntervalType = .irregular
 	) {
-		self.labelsAsTags = labelsAsTags
-		self.telemetryType = telemetryType
 		self.intervalType = intervalType
 		api = .make(options: options)
 	}
@@ -192,30 +186,12 @@ package struct InfluxDBWriter: Sendable {
 	) async throws -> QueryAPI.FluxRecord? {
 		try await api.load(measurement: measurement, tags: tags, fields: fields)
 	}
-
+	
 	package func write(
-		measurement: String,
-		tags: [String: String],
-		fields: [String: InfluxDBClient.Point.FieldValue],
-		unspecified: [(String, InfluxDBClient.Point.FieldValue)],
-		measurementID: UUID,
-		date: Date = Date()
+		point: InfluxDBClient.Point,
+		measurementID: UUID
 	) {
-		let point = InfluxDBClient.Point(measurement)
-		point.addTag(key: "telemetry_type", value: telemetryType)
-		for (key, value) in unspecified {
-			if labelsAsTags.contains(key, in: measurement) {
-				point.addTag(key: key, value: value.string)
-			} else {
-				point.addField(key: key, value: value)
-			}
-		}
-		for (key, value) in tags {
-			point.addTag(key: key, value: value)
-		}
-		for (key, value) in fields {
-			point.addField(key: key, value: value)
-		}
+		let date = Date()
 		let nextPoint: @Sendable (Date) -> InfluxDBClient.Point = { date in
 			point.time(time: .date(date))
 		}

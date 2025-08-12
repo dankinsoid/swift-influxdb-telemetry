@@ -30,6 +30,7 @@ public struct InfluxDBAnalyticsHandler: AnalyticsHandler {
 	private let api: InfluxDBWriter
 	private let uuid = UUID()
 	private let measurementNamePolicy: MeasurementNamePolicy
+	private let labelsAsTags: LabelsSet
 
 	/// Create a new `InfluxDBAnalyticsHandler`.
 	/// - Parameters:
@@ -43,13 +44,10 @@ public struct InfluxDBAnalyticsHandler: AnalyticsHandler {
 		parametersLabelsAsTags: LabelsSet = .analyticsDefault,
 		parameters: Analytics.Parameters = [:]
 	) {
-		api = InfluxDBWriter(
-			options: options,
-			labelsAsTags: parametersLabelsAsTags,
-			telemetryType: "analytics"
-		)
+		api = InfluxDBWriter(options: options)
 		self.measurementNamePolicy = measurementNamePolicy
 		self.parameters = parameters
+		self.labelsAsTags = parametersLabelsAsTags
 	}
 
 	/// Create a new `InfluxDBAnalyticsHandler`.
@@ -133,7 +131,9 @@ public struct InfluxDBAnalyticsHandler: AnalyticsHandler {
 			tags: [:],
 			fields: [:],
 			unspecified: data,
-			measurementID: uuid
+			measurementID: uuid,
+			telemetryType: "analytics",
+			labelsAsTags: labelsAsTags
 		)
 	}
 

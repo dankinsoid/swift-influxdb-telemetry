@@ -8,12 +8,10 @@ final class AggregateRecorder: InfluxMetric, RecorderHandler {
 	var id: HandlerID { handler.id }
 	let handler: InfluxMetricHandler<Double>
     let counter: CoreMetrics.Counter
-    let coldStart: Bool
     let dimensions: [(String, String)]
 
-    init(handler: InfluxMetricHandler<Double>, dimensions: [(String, String)], coldStart: Bool) {
+    init(handler: InfluxMetricHandler<Double>, dimensions: [(String, String)]) {
         self.handler = handler
-        self.coldStart = coldStart
         self.dimensions = dimensions
         counter = CoreMetrics.Counter(label: handler.id.label + "_total", dimensions: dimensions)
     }

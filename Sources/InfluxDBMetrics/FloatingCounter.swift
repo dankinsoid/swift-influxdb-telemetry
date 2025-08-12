@@ -7,17 +7,15 @@ final class FloatingCounter: InfluxMetric, FloatingPointCounterHandler {
 
 	var id: HandlerID { handler.id }
 	let handler: InfluxMetricHandler<Double>
-    let coldStart: Bool
     let dimensions: [(String, String)]
     
-    init(handler: InfluxMetricHandler<Double>, dimensions: [(String, String)], coldStart: Bool) {
+    init(handler: InfluxMetricHandler<Double>, dimensions: [(String, String)]) {
         self.handler = handler
-        self.coldStart = coldStart
         self.dimensions = dimensions
     }
 
 	func increment(by amount: Double) {
-        handler.modify(dimensions: dimensions, loadValues: !coldStart) {
+        handler.modify(dimensions: dimensions) {
 			// We busy loop here until we can update the atomic successfully.
 			// Using relaxed ordering here is sufficient, since the as-if rules guarantess that
 			// the following operations are executed in the order presented here. Every statement

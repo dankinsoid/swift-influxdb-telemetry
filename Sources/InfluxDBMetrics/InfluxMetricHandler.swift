@@ -11,99 +11,51 @@ protocol InfluxMetricValue: Sendable where AsAtomic.AtomicRepresentation.Value =
 }
 
 protocol AnyInfluxMetricHandler: Sendable {
-    var id: HandlerID { get }
-    init(id: HandlerID, api: InfluxDBWriter)
+	var id: HandlerID { get }
+	init(id: HandlerID, writer: InfluxDBPointsWriter, labelsAsTags: LabelsSet)
 }
 
 final class InfluxMetricHandler<Value: InfluxMetricValue>: AnyInfluxMetricHandler {
-
+	
 	let id: HandlerID
-	private let didLoad = ManagedAtomic(false)
-    private let atomic = ManagedAtomic(0 as Value.AsAtomic)
-	private let intervalTask = NIOLockedValueBox<Task<Void, Error>?>(nil)
-	private let query = NIOLockedValueBox([@Sendable (Bool) -> Void]())
-	private let api: InfluxDBWriter
+	private let atomic = ManagedAtomic(0 as Value.AsAtomic)
+	private let writer: InfluxDBPointsWriter
 	private let uuid = UUID()
-
+	private let labelsAsTags: LabelsSet
+	
 	init(
 		id: HandlerID,
-		api: InfluxDBWriter
+		writer: InfluxDBPointsWriter,
+		labelsAsTags: LabelsSet
 	) {
-		self.api = api
+		self.writer = writer
 		self.id = id
+		self.labelsAsTags = labelsAsTags
 	}
-
+	
 	deinit {
-		api.close(measurementID: uuid)
+		writer.close(measurementID: uuid)
 	}
-
+	
 	func modify(
-        dimensions: [(String, String)],
-		loadValues: Bool = false,
-        _ operation: @Sendable @escaping (ManagedAtomic<Value.AsAtomic>) -> Void
+		dimensions: [(String, String)],
+		_ operation: @Sendable @escaping (ManagedAtomic<Value.AsAtomic>) -> Void
 	) {
-		let prependDate = Date()
-		let date = Date()
-		let writeOperation: @Sendable (Bool) -> Void = { [weak self] prependValue in
-			guard let self else { return }
-			if prependValue {
-                self.write(dimensions: dimensions, date: prependDate)
-			}
-			operation(self.atomic)
-            self.write(dimensions: dimensions, date: date)
-		}
-		let isLoading = !query.withLockedValue(\.isEmpty)
-		if isLoading || loadValues && !didLoad.load(ordering: .sequentiallyConsistent) {
-            addOperationToQueue(writeOperation)
-		} else {
-			writeOperation(false)
-		}
+		operation(self.atomic)
+		self.write(dimensions: dimensions, date: Date())
 	}
 
 	private func write(dimensions: [(String, String)], date: Date) {
-		api.write(
+		writer.write(
 			measurement: id.label,
-            tags: [:],
-            fields: ["value": Value.fieldValue(from: atomic.load(ordering: .relaxed))],
-            unspecified: dimensions.map { ($0.0, .string($0.1)) },
+			tags: [:],
+			fields: ["value": Value.fieldValue(from: atomic.load(ordering: .relaxed))],
+			unspecified: dimensions.map { ($0.0, .string($0.1)) },
 			measurementID: uuid,
+			telemetryType: "metrics",
+			labelsAsTags: labelsAsTags,
 			date: date
 		)
-	}
-
-	private func addOperationToQueue(
-		_ operation: @Sendable @escaping (Bool) -> Void
-	) {
-		let needStart = query.withLockedValue {
-			$0.append(operation)
-			return $0.count == 1
-		}
-		if needStart {
-			Task {
-				await loadValue()
-			}
-		}
-	}
-
-	private func loadValue() async {
-		var needPrepend = false
-		do {
-			if
-				let result = try await api.load(measurement: id.label, tags: id.tags, fields: ["value"]),
-                let value = result.values["_value"].flatMap(Value.loaded)
-			{
-				atomic.store(value, ordering: .sequentiallyConsistent)
-			} else {
-				needPrepend = true
-			}
-		} catch {}
-		query.withLockedValue {
-			for i in $0.indices {
-				$0[i](needPrepend && i == 0)
-			}
-			$0 = []
-		}
-		didLoad.store(true, ordering: .sequentiallyConsistent)
 	}
 }
 

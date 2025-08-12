@@ -35,6 +35,7 @@ public struct InfluxDBLogHandler: LogHandler {
 	private let api: InfluxDBWriter
 	private let uuid = UUID()
 	private let measurementNamePolicy: MeasurementNamePolicy
+	private let labelsAsTags: LabelsSet
 
 	/// Create a new `InfluxDBLogHandler`.
 	/// - Parameters:
@@ -59,11 +60,8 @@ public struct InfluxDBLogHandler: LogHandler {
 		self.label = label
 		self.measurementNamePolicy = measurementNamePolicy
 		self.metadataProvider = metadataProvider
-		api = InfluxDBWriter(
-			options: options,
-			labelsAsTags: metadataLabelsAsTags,
-			telemetryType: "logging"
-		)
+		self.labelsAsTags = metadataLabelsAsTags
+		api = InfluxDBWriter(options: options)
 	}
 
 	/// Create a new `InfluxDBLogHandler`.
@@ -173,7 +171,9 @@ public struct InfluxDBLogHandler: LogHandler {
 			tags: [:],
 			fields: ["message": .string(message.description)],
 			unspecified: data,
-			measurementID: uuid
+			measurementID: uuid,
+			telemetryType: "logging",
+			labelsAsTags: labelsAsTags
 		)
 	}
 

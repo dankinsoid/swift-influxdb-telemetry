@@ -8,11 +8,9 @@ final class TimerMetric: InfluxMetric, TimerHandler {
 	var id: HandlerID { handler.id }
 	let handler: InfluxMetricHandler<Int>
     let dimensions: [(String, String)]
-    let coldStart: Bool
     
-    init(handler: InfluxMetricHandler<Int>, dimensions: [(String, String)], coldStart: Bool) {
+    init(handler: InfluxMetricHandler<Int>, dimensions: [(String, String)]) {
         self.handler = handler
-        self.coldStart = coldStart
         self.dimensions = dimensions
     }
 
